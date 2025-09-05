@@ -52,34 +52,34 @@ Here’s the cleaned-up version of that whole section with proper Markdown forma
 git checkout main
 git pull
 ```
-Create a new branch
+### Create a new branch
 ```
 git checkout -b feat/<short-description>
 ```
 
-Examples:
+### Examples:
 ```
 git checkout -b feat/docker-compose
 git checkout -b fix/readme-typos
 ```
-Do your edits, then commit
+### Do your edits, then commit
 ```
 git add .
 git commit -m "feat: add docker-compose stack"
 ```
-Push your branch to GitHub
+### Push your branch to GitHub
 ```
 git push -u origin feat/<short-description>
 ```
-1. Open a Pull Request (PR) on GitHub
+### 1. Open a Pull Request (PR) on GitHub
 
-2. Select main as the base branch.
+### 2. Select main as the base branch.
 
-3. Assign a classmate to review.
+### 3. Assign a classmate to review.
 
-4. After approval, merge through the GitHub UI.
+### 4. After approval, merge through the GitHub UI.
 
-Branch Naming Convention
+### Branch Naming Convention
 ```
 feat/... → new features (e.g., feat/web-app)
 
@@ -87,22 +87,22 @@ fix/... → bug fixes (e.g., fix/login-error)
 
 chore/... → cleanup or maintenance (e.g., chore/update-readme)
 ```
-Quickstart (infrastructure only for now)
+### Quickstart (infrastructure only for now)
 
-Install Docker Desktop (Windows with WSL2 backend).
+### Install Docker Desktop (Windows with WSL2 backend).
 
-Clone the repository:
+### Clone the repository:
 ```
 git clone https://github.com/<your-username>/ai-sec-monitor.git
 cd ai-sec-monitor/infra
 ```
 
-Launch the environment:
+### Launch the environment:
 ```
 docker compose up -d --build
 ```
 
-Access services (once configured):
+### Access services (once configured):
 ```
 OpenSearch Dashboards: http://localhost:5601
 
@@ -110,13 +110,13 @@ Grafana: http://localhost:3000
 
 Demo web app: http://localhost:8080
 ```
-License
+### License
 
 Apache 2.0 — see LICENSE
 .
 
-Notes
+### Notes
 
-This project uses only synthetic data in a controlled lab environment.
+- This project uses only synthetic data in a controlled lab environment.
 
-Do not connect it to real institutional systems without explicit written permission.
+- Do not connect it to real institutional systems without explicit written permission.
