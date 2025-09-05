@@ -16,7 +16,7 @@ This repository is structured for teamwork. It uses **branch protection rules** 
 
 ---
 ## Repository Structure
----
+```
 ai-sec-monitor/
 ├─ docs/ # Documentation
 ├─ infra/ # Docker and infrastructure
@@ -27,7 +27,7 @@ ai-sec-monitor/
 ├─ notify/ # Alerting integrations
 ├─ ui/ # Dashboards and optional UI
 └─ scripts/ # Helper scripts
----
+```
 ---
 
 ## Workflow for Classmates
