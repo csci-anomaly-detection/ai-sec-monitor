@@ -1,0 +1,29 @@
+# General
+.DS_Store
+Thumbs.db
+.env
+.env.*
+*.log
+tmp/
+dist/
+build/
+coverage/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+
+# Python venv
+.venv/
+venv/
+
+# Docker
+**/.dockerignore

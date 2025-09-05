@@ -1,0 +1,11 @@
+name: Lint
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JSON lint
+        uses: zoexx/github-action-json-file-lint@v1
