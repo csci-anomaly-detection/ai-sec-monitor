@@ -15,7 +15,6 @@ This repository is structured for teamwork. It uses **branch protection rules** 
 - Send alerts via dashboards and notifications.
 
 ---
-
 ## Repository Structure
 ai-sec-monitor/
 ├─ docs/ # Documentation
@@ -27,10 +26,6 @@ ai-sec-monitor/
 ├─ notify/ # Alerting integrations
 ├─ ui/ # Dashboards and optional UI
 └─ scripts/ # Helper scripts
-
-yaml
-Copy code
-
 ---
 
 ## Workflow for Classmates
