@@ -39,32 +39,36 @@ ai-sec-monitor/
   - At least one review is required before merging.
 - This keeps the project stable and avoids breaking the main line.
 
-### How to Contribute
-1. Make sure you are up to date:
-   ```bash
-   git checkout main
-   git pull
-Create a new branch for your work:
+ChatGPT said:
 
-bash
-Copy code
+Ah, I see what happened — when you pasted commands into the README, GitHub didn’t recognize them as code blocks. Same fix as before: wrap them with triple backticks.
+
+Here’s the cleaned-up version of that whole section with proper Markdown formatting:
+
+## How to Contribute
+
+### Stay up to date
+```bash
+git checkout main
+git pull
+
+Create a new branch
 git checkout -b feat/<short-description>
-Example:
+
+
+Examples:
+
 git checkout -b feat/docker-compose
 git checkout -b fix/readme-typos
 
-Do your edits, then commit:
-
-bash
-Copy code
+Do your edits, then commit
 git add .
 git commit -m "feat: add docker-compose stack"
-Push your branch to GitHub:
 
-bash
-Copy code
+Push your branch to GitHub
 git push -u origin feat/<short-description>
-Open a Pull Request (PR) on GitHub.
+
+Open a Pull Request (PR) on GitHub
 
 Select main as the base branch.
 
@@ -73,6 +77,7 @@ Assign a classmate to review.
 After approval, merge through the GitHub UI.
 
 Branch Naming Convention
+
 feat/... → new features (e.g., feat/web-app)
 
 fix/... → bug fixes (e.g., fix/login-error)
@@ -80,19 +85,20 @@ fix/... → bug fixes (e.g., fix/login-error)
 chore/... → cleanup or maintenance (e.g., chore/update-readme)
 
 Quickstart (infrastructure only for now)
+
 Install Docker Desktop (Windows with WSL2 backend).
 
 Clone the repository:
 
-bash
-Copy code
 git clone https://github.com/<your-username>/ai-sec-monitor.git
 cd ai-sec-monitor/infra
+
+
 Launch the environment:
 
-bash
-Copy code
 docker compose up -d --build
+
+
 Access services (once configured):
 
 OpenSearch Dashboards: http://localhost:5601
@@ -102,9 +108,12 @@ Grafana: http://localhost:3000
 Demo web app: http://localhost:8080
 
 License
-Apache 2.0 — see LICENSE.
+
+Apache 2.0 — see LICENSE
+.
 
 Notes
+
 This project uses only synthetic data in a controlled lab environment.
 
 Do not connect it to real institutional systems without explicit written permission.
