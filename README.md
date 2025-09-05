@@ -71,13 +71,13 @@ git commit -m "feat: add docker-compose stack"
 ```
 git push -u origin feat/<short-description>
 ```
-### 1. Open a Pull Request (PR) on GitHub
+1. Open a Pull Request (PR) on GitHub
 
-### 2. Select main as the base branch.
+2. Select main as the base branch.
 
-### 3. Assign a classmate to review.
+3. Assign a classmate to review.
 
-### 4. After approval, merge through the GitHub UI.
+4. After approval, merge through the GitHub UI.
 
 ### Branch Naming Convention
 ```
