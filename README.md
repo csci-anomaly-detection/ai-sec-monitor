@@ -39,12 +39,6 @@ ai-sec-monitor/
   - At least one review is required before merging.
 - This keeps the project stable and avoids breaking the main line.
 
-ChatGPT said:
-
-Ah, I see what happened — when you pasted commands into the README, GitHub didn’t recognize them as code blocks. Same fix as before: wrap them with triple backticks.
-
-Here’s the cleaned-up version of that whole section with proper Markdown formatting:
-
 ## How to Contribute
 
 ### Stay up to date
