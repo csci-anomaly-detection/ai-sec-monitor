@@ -1,0 +1,25 @@
+%YAML 1.1
+---
+default-log-dir: /var/log/suricata
+
+pcap:
+  - interface: ens5
+
+outputs:
+  - fast:      { enabled: yes, filename: fast.log }
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      community-id: true
+      types: [ alert, flow, http, dns, tls, ssh, stats ]
+
+# Only use /etc/suricata/rules and ONLY local.rules
+default-rule-path: /etc/suricata/rules
+rule-files:
+  - local.rules
+
+vars:
+  address-groups:
+    HOME_NET: "[10.10.0.0/16,172.31.30.154]"
+    EXTERNAL_NET: "!$HOME_NET"

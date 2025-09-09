@@ -1,0 +1,9 @@
+services:
+  sensor:
+    command: ["--pcap","-c","/etc/suricata/suricata.yaml"]
+    network_mode: host
+    cap_add: ["NET_ADMIN","NET_RAW"]
+    volumes:
+      - ../logs/suricata:/var/log/suricata
+      - ./services/sensor/suricata.yaml:/etc/suricata/suricata.yaml:ro
+      - ./services/sensor/rules:/var/lib/suricata/rules

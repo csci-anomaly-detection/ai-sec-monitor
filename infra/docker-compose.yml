@@ -1,1 +1,85 @@
+name: ai-sec-monitor
+networks:
+  campus_net:
+    driver: bridge
+    ipam:
+      config: [ { subnet: 10.10.0.0/24 } ]
+
+volumes: { dbdata: {} }
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    networks:
+      campus_net:
+        ipv4_address: 10.10.0.12
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  authapp:
+    build: ./services/auth-app
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      AUTH_SECRET: ${AUTH_SECRET}
+    expose: ["3000"]
+    networks:
+      campus_net:
+        ipv4_address: 10.10.0.11
+    restart: unless-stopped
+
+  web:
+    image: nginx:alpine
+    depends_on: [authapp]
+    ports: ["80:80"]        # classmates use http://<your-ip>
+    volumes:
+      - ./services/auth-app/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      campus_net:
+        ipv4_address: 10.10.0.10
+    restart: unless-stopped
+
+  workstation:
+    build: ./services/workstation
+    depends_on: [web]
+    networks:
+      campus_net:
+        ipv4_address: 10.10.0.20
+    restart: unless-stopped
+
+  honeypot:
+    image: cowrie/cowrie:latest
+    container_name: honeypot
+    networks:
+      campus_net:
+        ipv4_address: 10.10.0.30
+    volumes:
+      - ../logs/cowrie:/cowrie/var/log/cowrie
+    # OPTIONAL: expose to classmates on host port 2222 (safer than 22)
+    # ports:
+    #   - "2222:2222"
+    restart: unless-stopped
+
+  sensor:
+    image: jasonish/suricata:latest
+    container_name: sensor
+    network_mode: host
+    cap_add: ["NET_ADMIN","NET_RAW"]
+    command: [ "-c", "/etc/suricata/suricata.yaml" ]
+    volumes:
+      - /srv/campus-sim/ai-sec-monitor/logs/suricata:/var/log/suricata
+      - /srv/campus-sim/ai-sec-monitor/infra/services/sensor/suricata.yaml:/etc/suricata/suricata.yaml:ro
+      - /srv/campus-sim/ai-sec-monitor/infra/services/sensor/rules:/etc/suricata/rules:ro
+    restart: unless-stopped
 
