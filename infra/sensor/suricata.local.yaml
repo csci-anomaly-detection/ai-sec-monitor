@@ -1,0 +1,43 @@
+%YAML 1.1
+---
+# Capture both Docker NICs (LAN = eth0, DMZ = eth1)
+af-packet:
+  - interface: eth0
+    cluster-id: 10
+    cluster-type: cluster_flow
+    defrag: yes
+  - interface: eth1
+    cluster-id: 11
+    cluster-type: cluster_flow
+    defrag: yes
+
+default-log-dir: /var/log/suricata
+
+# Define network and port variables used by ET rules
+vars:
+  address-groups:
+    HOME_NET: "[10.77.0.0/24,10.77.10.0/24]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"       # treat our hosts as potential HTTP servers (fine for lab)
+  port-groups:
+    HTTP_PORTS: "[80,443,8080,8081,8000,8008,8888]"
+
+# Load ET Open rules (downloaded by suricata-update) + your local rules
+rule-files:
+  - /var/lib/suricata/rules/suricata.rules
+  - /etc/suricata/rules/local.rules
+
+# Disable industrial protocols that caused parse errors
+app-layer:
+  protocols:
+    dnp3:
+      enabled: no
+    modbus:
+      enabled: no
+
+# EVE JSON output with useful event types
+outputs:
+  - eve-log:
+      enabled: yes
+      filename: eve.json
+      types: [ alert, dns, http, tls, flow, ssh ]
