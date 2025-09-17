@@ -1,0 +1,61 @@
+rules:
+  - id: api_5xx_spike
+    description: "Spike in 5xx errors (>=20 in 5m)"
+    index: "nginx-*"
+    severity: high
+    condition:
+      type: count
+      field: status
+      match: "5xx"
+      threshold: 20
+      window: "5m"
+
+  - id: auth_bruteforce
+    description: "Brute-force login attempts (>=10 fails same IP in 10m)"
+    index: "app-*"
+    severity: high
+    condition:
+      type: group_count
+      group_by: client_ip
+      field: auth_result
+      match: fail
+      threshold: 10
+      window: "10m"
+
+  - id: db_slow_query_storm
+    description: "30+ slow queries (>=1s) in 10m"
+    index: "pg-*"
+    severity: medium
+    condition:
+      type: count
+      field: duration_ms
+      op: ">="
+      value: 1000
+      threshold: 30
+      window: "10m"
+
+  - id: api_latency_anomaly
+    description: "Unusual API response time patterns"
+    index: "nginx-*"
+    severity: medium
+    condition:
+      type: anomaly
+      features:
+        - duration_ms
+        - status
+      contamination: 0.05
+      threshold: -0.5
+      window: "30m"
+
+  - id: auth_pattern_anomaly
+    description: "Unusual authentication patterns"
+    index: "app-*"
+    severity: medium
+    condition:
+      type: anomaly
+      features:
+        - auth_result
+        - client_ip
+      contamination: 0.1
+      threshold: -0.6
+      window: "60m"
