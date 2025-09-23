@@ -1,0 +1,48 @@
+GEMMA3:270M (270M Parameters):
+(venv) PS D:\CSCI390\ai-agent> python main.py
+{
+  "summary": "The alert indicates a potential security attack on a server. The rule N/A was detected, and the logs indicate an event of 'alert' and 'flow' with TCP ports of 49152 and 8080.  The attack technique is 'Attempted Administrator Privilege Gain'. The rationale is that the attacker gained administrative privileges on the server.  The next steps involve isolating the server and performing a full system scan.  The rule ID is 2001219.  The following steps are recommended.",
+  "severity": "high",
+  "confidence": 0.5,
+  "attack_technique": "Attempted Administrator Privilege Gain",
+  "rationale": "This attack is likely a successful attack because of the increased access to the server and the potential for administrative privilege gain.",
+  "next_steps": [
+    "...",
+    "..."
+  ],
+  "severity_score": 3
+}
+
+
+QWEN 0.6B (752M Parameters):
+(venv) PS D:\CSCI390\ai-agent> python main.py
+{
+  "summary": "A network Trojan was detected via ET Malware C2 traffic, with a high severity.",
+  "severity": "medium",
+  "confidence": 0.5,
+  "attack_technique": "Network Trojan (ET Malware Possible Emotet C2 Traffic)",
+  "rationale": "The logs indicate a high-severity incident involving a Network Trojan via a known ET Malware C2 traffic pattern. The presence of multiple alert entries confirms an ongoing attack.",
+  "next_steps": [
+    "Investigate the source IP and C2 communication patterns",
+    "Monitor traffic for further malicious activity",
+    "Update network defenses and patching systems"
+  ],
+  "severity_score": 2
+}
+
+GEMMA4:4B (4B parameters)
+{
+  "summary": "A network anomaly involving potential Emotet C2 traffic (rule 2100498) and a possible Shellshock attempt (rule 2001219) observed on September 21, 2025. The logs indicate unusual traffic patterns and potential exploitation attempts.",
+  "severity": "medium",
+  "confidence": 0.5,
+  "attack_technique": "C2 Communication (Potential Emotet)",
+  "rationale": "The initial alert (rule 2100498) flags TCP traffic from 192.168.1.10 to 10.0.0.5 on port 443, which is indicative of potential Command and Control (C2) communication.  The second alert (rule 2001219) suggests a Shellshock attempt, adding a layer of potential vulnerability exploitation. The statistical data provides further context to the network activity.",
+  "next_steps": [
+    "Investigate the source IP address 192.168.1.10 and its associated connection for Emotet C2 activity.",
+    "Analyze the traffic patterns associated with the Shellshock attempt and the destination IP 198.51.100.10.",
+    "Perform deep packet inspection (DPI) on the traffic to identify the nature of the data being exchanged.",
+    "Check endpoint logs for malware detection or suspicious processes related to the involved IPs.",
+    "Review firewall logs for blocked connections or attempted exploits."
+  ],
+  "severity_score": 2
+}

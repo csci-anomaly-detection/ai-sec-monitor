@@ -1,0 +1,28 @@
+Analyze the following security alert:
+
+Rule: {{ rule_name }} ({{ rule_id }})
+MITRE ATT&CK Technique: {{ technique }}
+Logs:
+{% for log in logs %}
+- {{ log }}
+{% endfor %}
+
+Generate a structured summary with:
+- concise summary
+- severity
+- confidence
+- attack technique
+- rationale
+- next steps
+
+Please ONLY respond with valid JSON, do NOT include any explanations or thinking steps.
+
+Generate a structured JSON with:
+{
+  "summary": "...",
+  "severity": "...",
+  "confidence": "...",
+  "attack_technique": "...",
+  "rationale": "...",
+  "next_steps": ["...", "..."]
+}
