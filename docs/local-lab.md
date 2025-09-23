@@ -62,3 +62,19 @@ How to stop the lab:
 cd infra
 docker compose -f docker-compose.local.yml down
 
+---
+
+# Routed LAN↔DMZ Lab (Server Integration)
+
+This variant runs the FRR router + Suricata IDS on the **shared server** instead of just a laptop.
+
+## What you get
+- LAN subnet (10.77.0.0/24) with workstation
+- DMZ subnet (10.77.10.0/24) with web server and Cowrie honeypot
+- FRR router bridging LAN↔DMZ with NAT enabled for LAN→DMZ
+- Suricata sensor monitoring both LAN and DMZ bridges and writing alerts to `logs/suricata/`
+
+## Start the routed lab
+```bash
+cd infra
+docker compose -f docker-compose.routed.yml up -d router web honeypot workstation sensor
