@@ -1,0 +1,79 @@
+name: ai-sec-monitor
+
+networks:
+  lan_net:
+    driver: bridge
+    ipam: { config: [ { subnet: 10.77.0.0/24 } ] }
+  dmz_net:
+    driver: bridge
+    ipam: { config: [ { subnet: 10.77.10.0/24 } ] }
+
+services:
+  router:
+    image: quay.io/frrouting/frr:10.4.1
+    container_name: router
+    privileged: true
+    cap_add: ["NET_ADMIN","NET_RAW"]
+    networks:
+      lan_net: { ipv4_address: 10.77.0.254 }
+      dmz_net: { ipv4_address: 10.77.10.254 }
+    volumes:
+      - ./router/frr.conf:/etc/frr/frr.conf:ro
+    command: >
+      bash -lc '
+        set -e
+        sysctl -w net.ipv4.ip_forward=1;
+        # Ensure iptables exists (image is Alpine today, but try both just in case)
+        if command -v apk >/dev/null 2>&1; then
+          apk update && apk add --no-cache iptables;
+        elif command -v apt-get >/dev/null 2>&1; then
+          apt-get update -y && apt-get install -y iptables;
+        fi
+        # NAT LAN->DMZ out eth1; allow forwards both ways (return path stateful)
+        iptables -t nat -C POSTROUTING -s 10.77.0.0/24 -o eth1 -j MASQUERADE 2>/dev/null \
+          || iptables -t nat -A POSTROUTING -s 10.77.0.0/24 -o eth1 -j MASQUERADE;
+        iptables -C FORWARD -i eth0 -o eth1 -j ACCEPT 2>/dev/null \
+          || iptables -A FORWARD -i eth0 -o eth1 -j ACCEPT;
+        iptables -C FORWARD -i eth1 -o eth0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null \
+          || iptables -A FORWARD -i eth1 -o eth0 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT;
+        /usr/lib/frr/frrinit.sh start;
+        tail -f /dev/null
+      '
+    restart: unless-stopped
+
+  web:
+    image: nginx:alpine
+    networks:
+      dmz_net: { ipv4_address: 10.77.10.10 }
+    restart: unless-stopped
+
+  honeypot:
+    image: cowrie/cowrie:latest
+    container_name: honeypot
+    networks:
+      dmz_net: { ipv4_address: 10.77.10.30 }
+    # no host ports; we test from the LAN workstation
+    restart: unless-stopped
+
+  workstation:
+    image: alpine:latest
+    networks:
+      lan_net: { ipv4_address: 10.77.0.20 }
+    cap_add: ["NET_ADMIN"]
+    command: [ "sh", "-lc", "ip route add 10.77.10.0/24 via 10.77.0.254 dev eth0 || true; sleep infinity" ]
+    restart: unless-stopped
+
+  sensor:
+    image: jasonish/suricata:latest
+    container_name: sensor
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    volumes:
+      - /srv/campus-sim/ai-sec-monitor/services/sensor/suricata.yaml:/etc/suricata/suricata.yaml
+      - /srv/campus-sim/ai-sec-monitor/services/sensor/rules:/etc/suricata/rules
+      - /srv/campus-sim/ai-sec-monitor/logs/suricata:/var/log/suricata
+    command: ["--af-packet","-c","/etc/suricata/suricata.yaml"]
+    restart: unless-stopped
