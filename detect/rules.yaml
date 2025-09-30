@@ -1,61 +1,99 @@
 rules:
-  - id: api_5xx_spike
-    description: "Spike in 5xx errors (>=20 in 5m)"
-    index: "nginx-*"
+ 
+ # KEEP THESE - They work with Suricata logs:
+  - id: suricata_alert_storm
+    description: "High volume of Suricata alerts (>=10 in 4h)"
+    index: "*"
     severity: high
     condition:
       type: count
-      field: status
-      match: "5xx"
-      threshold: 20
-      window: "5m"
+      field: gid
+      match: "1"
+      threshold: 10
+      window: "4h"
 
-  - id: auth_bruteforce
-    description: "Brute-force login attempts (>=10 fails same IP in 10m)"
-    index: "app-*"
+  - id: suspicious_src_ip
+    description: "Single IP generating many alerts (>=5 in 4h)"  
+    index: "*"
     severity: high
     condition:
       type: group_count
-      group_by: client_ip
-      field: auth_result
-      match: fail
-      threshold: 10
-      window: "10m"
+      group_by: src_ip
+      field: gid
+      match: "1"
+      threshold: 5
+      window: "4h"
 
-  - id: db_slow_query_storm
-    description: "30+ slow queries (>=1s) in 10m"
-    index: "pg-*"
-    severity: medium
+  - id: metadata_service_alerts
+    description: "Alerts targeting honeypot services"
+    index: "*"
+    severity: critical
     condition:
       type: count
-      field: duration_ms
-      op: ">="
-      value: 1000
-      threshold: 30
-      window: "10m"
+      field: dest_port
+      match: "2222"
+      threshold: 3
+      window: "4h"
 
-  - id: api_latency_anomaly
-    description: "Unusual API response time patterns"
-    index: "nginx-*"
-    severity: medium
+  - id: high_priority_alerts
+    description: "High priority Suricata alerts"
+    index: "*" 
+    severity: high
+    condition:
+      type: count
+      field: priority
+      match: "3"
+      threshold: 1
+      window: "4h"
+
+  - id: advanced_traffic_anomaly
+    description: "Advanced ML-based traffic pattern anomaly"
+    index: "*"
+    severity: high
     condition:
       type: anomaly
       features:
-        - duration_ms
-        - status
+        - requests_per_minute
+        - unique_client_ips
+        - client_ip_entropy
+        - port_diversity
+        - hour_of_day
+        - suspicious_port_ratio
       contamination: 0.05
-      threshold: -0.5
+      threshold: -0.6
       window: "30m"
 
-  - id: auth_pattern_anomaly
-    description: "Unusual authentication patterns"
-    index: "app-*"
+  - id: suricata_behavioral_anomaly
+    description: "Suricata behavioral pattern anomaly"
+    index: "*"
     severity: medium
     condition:
       type: anomaly
       features:
-        - auth_result
-        - client_ip
+        - requests_per_minute
+        - alert_diversity
+        - signature_diversity
+        - avg_priority
+        - high_priority_ratio
+        - protocol_diversity
+        - tcp_ratio
       contamination: 0.1
-      threshold: -0.6
-      window: "60m"
+      threshold: -0.5
+      window: "45m"
+
+  - id: timing_pattern_anomaly  
+    description: "Unusual request timing patterns"
+    index: "*"
+    severity: medium
+    condition:
+      type: anomaly
+      features:
+        - avg_request_interval
+        - request_interval_stddev
+        - min_request_interval
+        - is_night_time
+        - is_weekend
+        - requests_per_second
+      contamination: 0.08
+      threshold: -0.4
+      window: "20m"
