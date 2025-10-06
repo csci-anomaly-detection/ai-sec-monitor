@@ -27,3 +27,13 @@ venv/
 
 # Docker
 **/.dockerignore
+.env
+volumes/
+__pycache__/
+*.pyc
+*.log
+*.pcap
+**/node_modules/
+**/.venv/
+**/venv/
+.DS_Store

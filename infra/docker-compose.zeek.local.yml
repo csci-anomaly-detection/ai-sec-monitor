@@ -1,0 +1,24 @@
+services:
+  zeek-local:
+    image: zeek/zeek:latest
+    container_name: zeek-local
+    user: root
+
+    # share router's network namespace so Zeek sees real traffic
+    network_mode: "container:router-local"
+    pid: "container:router-local"
+
+    privileged: true
+    cap_add: ["NET_ADMIN","NET_RAW"]
+    security_opt:
+      - seccomp=unconfined
+
+    environment:
+      - ZEEK_IFACE=eth1
+
+    volumes:
+      - ./logs/zeek:/var/log/zeek
+      - ./zeek/entrypoint.sh:/usr/local/bin/zeek-entrypoint.sh:ro
+
+    command: ["/bin/sh","-lc","/usr/local/bin/zeek-entrypoint.sh"]
+    restart: unless-stopped
