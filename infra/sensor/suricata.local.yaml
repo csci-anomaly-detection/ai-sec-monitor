@@ -41,3 +41,8 @@ outputs:
       enabled: yes
       filename: eve.json
       types: [ alert, dns, http, tls, flow, ssh ]
+  - fast:
+      enabled: yes
+      filename: fast.log
+      append: yes
+      limit: 1000
