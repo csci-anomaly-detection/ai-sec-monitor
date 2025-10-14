@@ -1,0 +1,48 @@
+10/14/2025-16:04:38.231744  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:38.231798  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:39.292857  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:39.292873  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:40.316781  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:40.316802  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:41.340755  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:41.340734  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:42.364776  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:42.364747  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:57248 -> 10.77.10.10:80
+10/14/2025-16:04:54.934590  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:58526 -> 10.77.10.10:80
+10/14/2025-16:04:54.934569  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:58526 -> 10.77.10.10:80
+10/14/2025-16:04:59.672819  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:04:59.675869  [**] [1:1000010:1] SQL Injection Attempt - UNION [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:04:59.672838  [**] [1:990101:1] DEMO HTTP SYN to DMZ web [**] [Classification: (null)] [Priority: 3] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:04:59.675877  [**] [1:1000010:1] SQL Injection Attempt - UNION [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:00.189908  [**] [1:1000010:1] SQL Injection Attempt - UNION [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:00.189899  [**] [1:1000010:1] SQL Injection Attempt - UNION [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:00.703168  [**] [1:1000011:1] SQL Injection Attempt - OR 1=1 [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:00.703161  [**] [1:1000011:1] SQL Injection Attempt - OR 1=1 [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:00.711419  [**] [1:1000060:1] HTTP Brute Force Login Attempt [**] [Classification: Attempted Administrator Privilege Gain] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:01.217719  [**] [1:1000011:1] SQL Injection Attempt - OR 1=1 [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:01.217728  [**] [1:1000011:1] SQL Injection Attempt - OR 1=1 [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:02.766001  [**] [1:1000020:1] XSS Attempt - Script Tag [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:02.765992  [**] [1:1000020:1] XSS Attempt - Script Tag [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:03.280200  [**] [1:1000020:1] XSS Attempt - Script Tag [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:03.280208  [**] [1:1000020:1] XSS Attempt - Script Tag [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:03.791560  [**] [1:1000021:1] XSS Attempt - JavaScript Event [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:03.791560  [**] [1:1000022:1] XSS Attempt - IMG Tag [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:03.791566  [**] [1:1000021:1] XSS Attempt - JavaScript Event [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:03.791566  [**] [1:1000022:1] XSS Attempt - IMG Tag [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:05.331322  [**] [1:1000022:1] XSS Attempt - IMG Tag [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:05.331328  [**] [1:1000022:1] XSS Attempt - IMG Tag [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:08.924575  [**] [1:1000032:1] Command Injection - System Files [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:08.924575  [**] [1:1000041:1] Directory Traversal - etc/passwd [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:08.924586  [**] [1:1000032:1] Command Injection - System Files [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:08.924586  [**] [1:1000041:1] Directory Traversal - etc/passwd [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:09.437888  [**] [1:1000040:1] Directory Traversal Attempt [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:10.455076  [**] [1:1000032:1] Command Injection - System Files [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:10.455076  [**] [1:1000041:1] Directory Traversal - etc/passwd [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:10.455088  [**] [1:1000032:1] Command Injection - System Files [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:10.455088  [**] [1:1000041:1] Directory Traversal - etc/passwd [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:10.965557  [**] [1:1000032:1] Command Injection - System Files [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:10.965557  [**] [1:1000041:1] Directory Traversal - etc/passwd [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:10.965565  [**] [1:1000032:1] Command Injection - System Files [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:10.965565  [**] [1:1000041:1] Directory Traversal - etc/passwd [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:11.478221  [**] [1:1000051:1] Web Shell Upload Attempt [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80
+10/14/2025-16:05:11.478229  [**] [1:1000051:1] Web Shell Upload Attempt [**] [Classification: Web Application Attack] [Priority: 1] {TCP} 10.77.0.20:58536 -> 10.77.10.10:80

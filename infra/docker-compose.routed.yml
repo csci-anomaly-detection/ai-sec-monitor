@@ -117,8 +117,8 @@ services:
       - NET_RAW
       - SYS_NICE
     volumes:
-      - /srv/campus-sim/ai-sec-monitor/services/sensor/suricata.yaml:/etc/suricata/suricata.yaml
-      - /srv/campus-sim/ai-sec-monitor/services/sensor/rules:/etc/suricata/rules
+      - /srv/campus-sim/ai-sec-monitor/infra/sensor/suricata.local.yaml:/etc/suricata/suricata.yaml
+      - /srv/campus-sim/ai-sec-monitor/infra/sensor/rules:/var/lib/suricata/rules
       - /srv/campus-sim/ai-sec-monitor/logs/suricata:/var/log/suricata
     command: ["--af-packet","-c","/etc/suricata/suricata.yaml"]
     restart: unless-stopped
