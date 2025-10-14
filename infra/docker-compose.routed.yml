@@ -42,9 +42,34 @@ services:
     restart: unless-stopped
 
   web:
-    image: nginx:alpine
+    cap_add: ["NET_ADMIN"]
+    image: vulnerables/web-dvwa:latest
+    container_name: dvwa
     networks:
       dmz_net: { ipv4_address: 10.77.10.10 }
+    ports:
+      - "8080:80" # Map host port 8080 to container port 80
+    environment:
+      MYSQL_USER: dvwa
+      MYSQL_PASSWORD: dvwa
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dvwa
+      MYSQL_HOST: db
+    command: >
+      sh -lc "
+        apache2-foreground;
+      "
+    restart: unless-stopped
+  db:
+    image: mysql:5.7
+    container_name: dvwa-db
+    networks:
+      dmz_net: { ipv4_address: 10.77.10.11 }
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dvwa
+      MYSQL_USER: dvwa
+      MYSQL_PASSWORD: dvwa
     restart: unless-stopped
 
   honeypot:
@@ -56,13 +81,33 @@ services:
     restart: unless-stopped
 
   workstation:
-    image: alpine:latest
+    image: ubuntu:latest
+    container_name: workstation
     networks:
       lan_net: { ipv4_address: 10.77.0.20 }
     cap_add: ["NET_ADMIN"]
-    command: [ "sh", "-lc", "ip route add 10.77.10.0/24 via 10.77.0.254 dev eth0 || true; sleep infinity" ]
+    volumes:
+      - /srv/campus-sim/ai-sec-monitor/infra/workstation:/workstation
+    command: >
+      bash -c "
+        set -e;
+        echo 'Fixing dpkg...';
+        dpkg --configure -a;
+        echo 'Updating package lists...';
+        apt-get update;
+        echo 'Installing packages...';
+        DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-pip python3-requests iproute2 curl iputils-ping;
+        echo 'Setting up networking...';
+        ip route add 10.77.10.0/24 via 10.77.0.254 dev eth0 || true;
+        echo 'Installing additional Python packages if needed...';
+        pip3 install --break-system-packages urllib3 || true;
+        echo 'Setup completed successfully!';
+        python3 --version;
+        pip3 --version;
+        python3 -c 'import requests; print(\"requests module available\")';
+        sleep infinity;
+      "
     restart: unless-stopped
-
   sensor:
     image: jasonish/suricata:latest
     container_name: sensor
@@ -72,8 +117,8 @@ services:
       - NET_RAW
       - SYS_NICE
     volumes:
-      - /srv/campus-sim/ai-sec-monitor/services/sensor/suricata.yaml:/etc/suricata/suricata.yaml
-      - /srv/campus-sim/ai-sec-monitor/services/sensor/rules:/etc/suricata/rules
+      - /srv/campus-sim/ai-sec-monitor/infra/sensor/suricata.local.yaml:/etc/suricata/suricata.yaml
+      - /srv/campus-sim/ai-sec-monitor/infra/sensor/rules:/var/lib/suricata/rules
       - /srv/campus-sim/ai-sec-monitor/logs/suricata:/var/log/suricata
     command: ["--af-packet","-c","/etc/suricata/suricata.yaml"]
     restart: unless-stopped

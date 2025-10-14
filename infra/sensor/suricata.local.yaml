@@ -1,15 +1,31 @@
 %YAML 1.1
 ---
-# Capture both Docker NICs (LAN = eth0, DMZ = eth1)
+# Capture both Docker NICs (LAN = eth0, DMZ = eth1)$/# Capture Docker bridge interfaces for the routed lab (infra_default, campus_net, dmz_net, lan_net)
 af-packet:
-  - interface: eth0
-    cluster-id: 10
+  - interface: br-0a7d5ef9f35f   # infra_default
+    cluster-id: 101
     cluster-type: cluster_flow
     defrag: yes
-  - interface: eth1
-    cluster-id: 11
+    use-mmap: yes
+    tpacket-v3: yes
+  - interface: br-8d4b06e14720   # ai-sec-monitor_campus_net
+    cluster-id: 102
     cluster-type: cluster_flow
     defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+  - interface: br-2bfdc7538b22   # ai-sec-monitor_dmz_net
+    cluster-id: 103
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+  - interface: br-1a8bb0d7890a   # ai-sec-monitor_lan_net
+    cluster-id: 104
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
 
 default-log-dir: /var/log/suricata
 
@@ -24,8 +40,7 @@ vars:
 
 # Load ET Open rules (downloaded by suricata-update) + your local rules
 rule-files:
-  - /var/lib/suricata/rules/suricata.rules
-  - /etc/suricata/rules/local.rules
+  - /var/lib/suricata/rules/local.rules
 
 # Disable industrial protocols that caused parse errors
 app-layer:
@@ -41,3 +56,10 @@ outputs:
       enabled: yes
       filename: eve.json
       types: [ alert, dns, http, tls, flow, ssh ]
+  - fast:
+      enabled: yes
+      filename: fast.log
+      append: yes
+      limit: 1000
+
+default-rule-path: /var/lib/suricata/rules
