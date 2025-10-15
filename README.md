@@ -77,7 +77,7 @@ ai-sec-monitor/
    
 `docker compose -f infra/docker-compose.routed.yml up -d --build`
 
-3.	Run the attack simulation
+2.	Run the attack simulation
 
 `docker exec -it workstation python3 /workstation/test_attacks.py`
 
