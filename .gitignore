@@ -25,5 +25,8 @@ pnpm-lock.yaml
 .venv/
 venv/
 
+# AI Agent output
+ai-agent/analysis_output/
+
 # Docker
 **/.dockerignore

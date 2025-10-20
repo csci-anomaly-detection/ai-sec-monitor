@@ -1,0 +1,46 @@
+{
+  "endpoint": "GET /alerts/live?hours_back=1",
+  "response_summary": {
+    "threats_detected": [
+      {
+        "ip": "172.31.30.154",
+        "severity": "HIGH",
+        "attack_type": "Reconnaissance / Scanning",
+        "total_events": 27,
+        "recommendation": "Block IP, monitor for lateral movement, check other systems"
+      }
+    ],
+    "alert_rules_triggered": [
+      {
+        "rule_id": "suricata_alert_storm",
+        "severity": "high",
+        "description": "High volume of Suricata alerts (>=10 in 4h)",
+        "matches_count": 94
+      },
+      {
+        "rule_id": "suspicious_src_ip", 
+        "severity": "high",
+        "description": "Single IP generating many alerts (>=5 in 4h)",
+        "matches_count": 27
+      },
+      {
+        "rule_id": "high_priority_alerts",
+        "severity": "high", 
+        "description": "High priority Suricata alerts",
+        "matches_count": 42
+      }
+    ],
+    "summary_stats": {
+      "threat_count": 1,
+      "high_severity_threats": 1,
+      "logs_analyzed": 94,
+      "rules_applied": 7
+    }
+  },
+  "integration_notes": [
+    "Main data is in response_summary.threats_detected array",
+    "Each threat represents one attacking IP with actionable data", 
+    "Poll every 1-5 minutes and check threat_count > 0",
+    "Focus on HIGH and CRITICAL severity threats"
+  ]
+}
