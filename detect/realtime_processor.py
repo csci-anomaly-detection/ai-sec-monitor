@@ -29,7 +29,7 @@ class SlidingWindowProcessor:
                  window_minutes: int = 5,
                  slide_minutes: int = 1,
                  max_logs_per_fetch: int = 1000,
-                 max_buffer_minutes: int = 120):  # Changed from 10 to 120 (2 hours)
+                 max_buffer_minutes: int = 120):
         """
         Initialize the sliding window processor.
         

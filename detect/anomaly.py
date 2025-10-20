@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, UTC
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Tuple, TYPE_CHECKING
-import numpy as np
-import pandas as pd
-from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
+import numpy as np # type: ignore
+import pandas as pd # type: ignore
+from sklearn.ensemble import IsolationForest # type: ignore
+from sklearn.preprocessing import StandardScaler # type: ignore
 from collections import Counter, defaultdict
 import hashlib
 import math

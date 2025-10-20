@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Query # type: ignore
+from fastapi.responses import JSONResponse # type: ignore
 from datetime import datetime, UTC, timedelta
 from pathlib import Path
 import sys

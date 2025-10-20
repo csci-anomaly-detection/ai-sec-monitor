@@ -3,8 +3,8 @@ from typing import List, Dict, Any, Optional
 import os
 import re
 import json
-import requests
-from dotenv import load_dotenv
+import requests # type: ignore
+from dotenv import load_dotenv # type: ignore
 
 class LokiDataSource:
     def __init__(self):

@@ -1,7 +1,7 @@
 import time
 import random
 import json
-import requests
+import requests # type: ignore
 import logging
 from datetime import datetime, UTC
 from typing import List, Dict, Any
