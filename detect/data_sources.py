@@ -89,7 +89,8 @@ class LokiDataSource:
             else:
                 return []
                 
-        except Exception:
+        except Exception as e:
+            logger.exception("Exception occurred during log querying in query_logs")
             return []
 
     def _parse_loki_response(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
