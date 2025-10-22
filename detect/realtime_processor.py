@@ -28,7 +28,7 @@ class SlidingWindowProcessor:
     def __init__(self, 
                  window_minutes: int = 5,
                  slide_minutes: int = 1,
-                 max_logs_per_fetch: int = 1000,
+                 max_logs_per_fetch: int = 5000,
                  max_buffer_minutes: int = 120):
         """
         Initialize the sliding window processor.
