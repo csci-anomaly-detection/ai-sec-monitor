@@ -446,17 +446,6 @@ class SlidingWindowProcessor:
         
         print("=== END TEST ===\n")
     
-    def setup_signal_handlers(self):
-        """Setup clean exit on Ctrl+C"""
-        def signal_handler(signum, frame):
-            if self.is_running:
-                logger.info("Received interrupt signal - stopping processor...")
-                self.stop_processing()
-            # Don't call sys.exit() - let the main loop exit naturally
-        
-        signal.signal(signal.SIGINT, signal_handler)
-
-
 # Main function for testing
 async def main():
     """
