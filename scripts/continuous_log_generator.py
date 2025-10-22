@@ -259,7 +259,12 @@ class ContinuousLogGenerator:
         logger.info("=== TESTING GUARANTEED THREAT GENERATION ===")
         
         logs = self.generate_guaranteed_threat_attack("192.168.1.100")
-        success = self.send_logs_to_loki(logs)
+        try:
+            asyncio.run(self.send_to_loki(logs))
+            success = True
+        except Exception as e:
+            logger.error(f"❌ Failed to send guaranteed threat logs: {e}")
+            success = False
         
         if success:
             logger.info(f"✅ Sent {len(logs)} guaranteed threat logs to Loki")
