@@ -205,7 +205,7 @@ class ThreatCorrelator:
         try:
             parts = value.split('.')
             return len(parts) == 4 and all(0 <= int(part) <= 255 for part in parts)
-        except:
+        except Exception:
             return False
 
 def format_threat_report(threats: List[ThreatIndicator]) -> str:
