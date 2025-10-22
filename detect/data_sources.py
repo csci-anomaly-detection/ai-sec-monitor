@@ -1,30 +1,39 @@
+import os
+import httpx
+import logging
 from datetime import datetime, timedelta, UTC
 from typing import List, Dict, Any, Optional
-import os
-import re
-import json
-import requests # type: ignore
 from dotenv import load_dotenv # type: ignore
+import json
+import re    
+
+logger = logging.getLogger(__name__)
 
 class LokiDataSource:
     def __init__(self):
         # Load environment variables
         load_dotenv()
         
-        # Use environment variables with fallbacks
-        self.base_url = os.getenv("LOKI_URL", "http://localhost:3100")
-        self.query_endpoint = f"{self.base_url}/loki/api/v1/query_range"
-        self.labels_endpoint = f"{self.base_url}/loki/api/v1/labels"
+        # Production server as fallback (server will use this)
+        # Local dev overrides via .env (LOKI_URL=http://localhost:3100)
+        self.base_url = os.getenv("LOKI_URL", "http://172.31.30.154:3101")
+        self.query_endpoint = os.getenv(
+            "LOKI_QUERY_ENDPOINT",
+            f"{self.base_url}/loki/api/v1/query_range"
+        )
+        self.labels_endpoint = os.getenv(
+            "LOKI_LABELS_ENDPOINT",
+            f"{self.base_url}/loki/api/v1/labels"
+        )
         self.health_endpoint = f"{self.base_url}/ready"
         self.timeout = 30
         
-        # Only log connection info once during initialization
-        # print(f"Connecting to Loki at: {self.base_url}")
+        logger.info(f"LokiDataSource initialized with base URL: {self.base_url}")
     
     def health_check(self) -> bool:
         """Check if Loki is available"""
         try:
-            response = requests.get(self.health_endpoint, timeout=5)
+            response = httpx.get(self.health_endpoint, timeout=5)
             return response.status_code == 200
         except Exception:
             return False
@@ -32,7 +41,7 @@ class LokiDataSource:
     def get_available_labels(self) -> List[str]:
         """Get all available labels from Loki"""
         try:
-            response = requests.get(self.labels_endpoint, timeout=self.timeout)
+            response = httpx.get(self.labels_endpoint, timeout=self.timeout)
             if response.status_code == 200:
                 data = response.json()
                 return data.get('data', [])
@@ -71,7 +80,7 @@ class LokiDataSource:
                 'direction': 'forward'
             }
             
-            response = requests.get(self.query_endpoint, params=params, timeout=self.timeout)
+            response = httpx.get(self.query_endpoint, params=params, timeout=self.timeout)
             
             if response.status_code == 200:
                 data = response.json()

@@ -3,7 +3,10 @@ import random
 import json
 import requests # type: ignore
 import logging
-from datetime import datetime, UTC
+import asyncio
+import httpx
+import os
+from datetime import datetime, UTC, timezone
 from typing import List, Dict, Any
 from pathlib import Path
 
@@ -111,51 +114,53 @@ class ContinuousLogGenerator:
         
         return alert_log
     
-    def send_logs_to_loki(self, logs: list) -> bool:
-        """Send generated logs directly to Loki."""
+    async def send_to_loki(self, logs: list[dict]) -> None:
+        """Send generated logs to Loki"""
         try:
-            # Prepare logs in Loki format
-            loki_payload = {
-                "streams": [
-                    {
-                        "stream": {
-                            "job": "suricata",
-                            "instance": "test-generator"
-                        },
-                        "values": []
-                    }
-                ]
-            }
-            
-            # Add each log as a timestamped entry
-            for log in logs:
-                # Fix timestamp parsing - handle the timezone properly
-                timestamp_str = log['timestamp']
-                if timestamp_str.endswith('+00:00'):
-                    timestamp_dt = datetime.fromisoformat(timestamp_str)
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Production server as fallback (server will use this)
+                # Local dev overrides via .env (LOKI_URL=http://localhost:3100)
+                base_url = os.getenv("LOKI_URL", "http://172.31.30.154:3101")
+                loki_url = f"{base_url}/loki/api/v1/push"
+                
+                # Prepare logs in Loki format
+                loki_payload = {
+                    "streams": [
+                        {
+                            "stream": {
+                                "job": "suricata",
+                                "instance": "test-generator"
+                            },
+                            "values": []
+                        }
+                    ]
+                }
+                
+                # Add each log as a timestamped entry
+                for log in logs:
+                    # Fix timestamp parsing - handle the timezone properly
+                    timestamp_str = log['timestamp']
+                    if timestamp_str.endswith('+00:00'):
+                        timestamp_dt = datetime.fromisoformat(timestamp_str)
+                    else:
+                        timestamp_dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        
+                    timestamp_ns = int(timestamp_dt.timestamp() * 1_000_000_000)
+                    log_line = json.dumps(log)
+                    loki_payload["streams"][0]["values"].append([str(timestamp_ns), log_line])
+                
+                # Send to Loki
+                headers = {"Content-Type": "application/json"}
+                
+                response = await client.post(loki_url, json=loki_payload, headers=headers)
+                
+                if response.status_code == 204:
+                    logger.info(f"Successfully sent {len(logs)} logs to Loki")
                 else:
-                    timestamp_dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                    
-                timestamp_ns = int(timestamp_dt.timestamp() * 1_000_000_000)
-                log_line = json.dumps(log)
-                loki_payload["streams"][0]["values"].append([str(timestamp_ns), log_line])
-            
-            # Send to Loki
-            loki_url = "http://localhost:3100/loki/api/v1/push"
-            headers = {"Content-Type": "application/json"}
-            
-            response = requests.post(loki_url, json=loki_payload, headers=headers, timeout=10)
-            
-            if response.status_code == 204:
-                logger.info(f"Successfully sent {len(logs)} logs to Loki")
-                return True
-            else:
-                logger.error(f"Failed to send logs to Loki: {response.status_code}")
-                return False
+                    logger.error(f"Failed to send logs to Loki: {response.status_code}")
                 
         except Exception as e:
             logger.error(f"Error sending logs to Loki: {e}")
-            return False
     
     def send_logs_via_file(self, logs: List[Dict[str, Any]]):
         """
@@ -210,12 +215,9 @@ class ContinuousLogGenerator:
                 logs = self.generate_attack_burst()
                 
                 # Send directly to Loki (works for real-time detection)
-                success = self.send_logs_to_loki(logs)
+                asyncio.run(self.send_to_loki(logs))
                 
-                if success:
-                    logger.info(f"Attack #{attack_count} completed - {len(logs)} logs generated")
-                else:
-                    logger.error(f"Attack #{attack_count} failed")
+                logger.info(f"Attack #{attack_count} completed - {len(logs)} logs generated")
                 
                 # Wait for next attack
                 logger.info(f"Waiting {self.interval_seconds}s until next attack...")
