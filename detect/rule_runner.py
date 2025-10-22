@@ -47,7 +47,7 @@ def matches_pattern(val: Any, pattern: str) -> bool:
     s = str(val)
     if pattern == "5xx":
         return s.isdigit() and len(s) == 3 and s.startswith("5")
-    if pattern.endswith("xx" ) and len(pattern) == 3:
+    if pattern.endswith("xx") and len(pattern) == 3:
         return s.isdigit() and s.startswith(pattern[0])
     return s == pattern
 
