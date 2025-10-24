@@ -8,6 +8,13 @@
         "attack_type": "Reconnaissance / Scanning",
         "total_events": 27,
         "recommendation": "Block IP, monitor for lateral movement, check other systems"
+      },
+      {
+        "ip": "192.168.100.50",
+        "severity": "CRITICAL",
+        "attack_type": "Active Exploitation Attempt",
+        "total_events": 156,
+        "recommendation": "IMMEDIATE ACTION: Block IP at firewall, isolate affected systems, initiate incident response"
       }
     ],
     "alert_rules_triggered": [
@@ -31,9 +38,9 @@
       }
     ],
     "summary_stats": {
-      "threat_count": 1,
-      "high_severity_threats": 1,
-      "logs_analyzed": 94,
+      "threat_count": 2,
+      "high_severity_threats": 2,
+      "logs_analyzed": 183,
       "rules_applied": 7
     }
   },

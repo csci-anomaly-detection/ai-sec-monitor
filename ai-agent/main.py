@@ -7,6 +7,7 @@ Reads threat data from JSON and analyzes it with LLM
 from file_reader import read_file
 from agents import analyze_threat
 from file_writer import write_analysis, write_analysis_json
+from email_agent import send_critical_alert
 import json
 
 
@@ -16,7 +17,9 @@ def main():
     1. Read the sample_response.json
     2. Extract threats
     3. Analyze each threat with LLM
-    4. Display results
+    4. Send email alerts for CRITICAL threats
+    5. Save analysis results
+    6. Display summary
     """
     
     print("AI SECURITY MONITOR - THREAT ANALYSIS PIPELINE")
@@ -46,6 +49,9 @@ def main():
     # Step 3: Analyze each threat with LLM
     print()
     
+    emails_sent = 0
+    emails_failed = 0
+    
     for idx, threat in enumerate(threats, 1):
         print(f"THREAT #{idx}")
         print(f"IP: {threat.get('ip')}")
@@ -67,7 +73,20 @@ def main():
         print(f"Analysis saved to: {txt_path}")
         print(f"JSON saved to: {json_path}")
         print()
-
+        
+        # Check if this is a CRITICAL threat and send email alert
+        if threat.get('severity') == 'CRITICAL':
+            print("CRITICAL threat detected - sending email alert...")
+            email_result = send_critical_alert(threat, analysis)
+            
+            if email_result['success']:
+                print(f"Email alert sent successfully to IT staff")
+                emails_sent += 1
+            else:
+                print(f"Warning: Email alert failed - {email_result['message']}")
+                emails_failed += 1
+            print()
+        
         print()
     
     # Step 4: Summary
@@ -75,6 +94,9 @@ def main():
     print(f"  Total threats analyzed: {len(threats)}")
     print(f"  High severity: {sum(1 for t in threats if t.get('severity') == 'HIGH')}")
     print(f"  Critical severity: {sum(1 for t in threats if t.get('severity') == 'CRITICAL')}")
+    print(f"  Email alerts sent: {emails_sent}")
+    if emails_failed > 0:
+        print(f"  Email alerts failed: {emails_failed}")
     print()
 
 
