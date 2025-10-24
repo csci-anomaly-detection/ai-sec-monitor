@@ -52,7 +52,13 @@ pip install python-dotenv ollama
 
 ### 2. Configure Email Settings
 
-Create a `.env` file in the `ai-agent` directory:
+Copy the example environment file and configure it:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` with your actual values:
 
 ```env
 SMTP_SERVER=smtp.gmail.com
