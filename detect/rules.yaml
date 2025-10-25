@@ -1,0 +1,99 @@
+rules:
+ 
+ # KEEP THESE - They work with Suricata logs:
+  - id: suricata_alert_storm
+    description: "High volume of Suricata alerts (>=10 in 4h)"
+    index: "*"
+    severity: high
+    condition:
+      type: count
+      field: gid
+      match: "1"
+      threshold: 10
+      window: "4h"
+
+  - id: suspicious_src_ip
+    description: "Single IP generating many alerts (>=5 in 4h)"  
+    index: "*"
+    severity: high
+    condition:
+      type: group_count
+      group_by: src_ip
+      field: gid
+      match: "1"
+      threshold: 5
+      window: "4h"
+
+  - id: metadata_service_alerts
+    description: "Alerts targeting honeypot services"
+    index: "*"
+    severity: critical
+    condition:
+      type: count
+      field: dest_port
+      match: "2222"
+      threshold: 3
+      window: "4h"
+
+  - id: high_priority_alerts
+    description: "High priority Suricata alerts"
+    index: "*" 
+    severity: high
+    condition:
+      type: count
+      field: priority
+      match: "3"
+      threshold: 1
+      window: "4h"
+
+  - id: advanced_traffic_anomaly
+    description: "Advanced ML-based traffic pattern anomaly"
+    index: "*"
+    severity: high
+    condition:
+      type: anomaly
+      features:
+        - requests_per_minute
+        - unique_client_ips
+        - client_ip_entropy
+        - port_diversity
+        - hour_of_day
+        - suspicious_port_ratio
+      contamination: 0.05
+      threshold: -0.6
+      window: "30m"
+
+  - id: suricata_behavioral_anomaly
+    description: "Suricata behavioral pattern anomaly"
+    index: "*"
+    severity: medium
+    condition:
+      type: anomaly
+      features:
+        - requests_per_minute
+        - alert_diversity
+        - signature_diversity
+        - avg_priority
+        - high_priority_ratio
+        - protocol_diversity
+        - tcp_ratio
+      contamination: 0.1
+      threshold: -0.5
+      window: "45m"
+
+  - id: timing_pattern_anomaly  
+    description: "Unusual request timing patterns"
+    index: "*"
+    severity: medium
+    condition:
+      type: anomaly
+      features:
+        - avg_request_interval
+        - request_interval_stddev
+        - min_request_interval
+        - is_night_time
+        - is_weekend
+        - requests_per_second
+      contamination: 0.08
+      threshold: -0.4
+      window: "20m"
