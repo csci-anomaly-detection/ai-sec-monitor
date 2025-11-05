@@ -32,7 +32,7 @@ def query_chroma(query_input: str):
     signature_id = parts[1] if len(parts) > 1 else None
     
     # Validate collection name
-    valid_collections = ["all_logs", "suricata_rules", "batched_alerts"]
+    valid_collections = ["all_logs", "suricata_rules", "batched_alerts", "mitre_attack"]
     if collection_name not in valid_collections:
         return json.dumps({
             "error": f"Invalid collection '{collection_name}'. Valid options: {', '.join(valid_collections)}"

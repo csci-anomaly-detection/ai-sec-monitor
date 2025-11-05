@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   chroma:
     image: ghcr.io/chroma-core/chroma:latest
@@ -12,9 +10,9 @@ services:
       - ./chroma-data:/chroma
     restart: unless-stopped
 
-  batching-agent:
+  agent:
     image: python:3.11-slim
-    container_name: batching-agent
+    container_name: ai_analysis
     depends_on:
       - chroma
     volumes:
@@ -28,8 +26,14 @@ services:
       - ./python-files/chroma_setup.py:/app/chroma_setup.py
       - ./python-files/postgres_setup.py:/app/postgres_setup.py
       - ./python-files/main.py:/app/main.py
+      - ./python-files/test_analyst_agent.py:/app/test_analyst_agent.py
       - ./demo_batch.json:/app/demo_batch.json
+      - ./agents/analyst-agent/analyst_agent.py:/app/analyst_agent.py
+      - ./agents/analyst-agent/email_agent.py:/app/email_agent.py
+      - ./agents/batching-agent/mitre_mapper.py:/app/mitre_mapper.py
+      - ./agents/tools/websearch.py:/app/websearch.py
       - ./pip-cache:/root/.cache/pip
+      - ./output:/app/output
     environment:
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
@@ -40,11 +44,15 @@ services:
       - POSTGRES_DB=alertsdb
       - OLLAMA_PORT=11434
       - PYTHONPATH=/app
+      - LOG_LOCATION=/app/logs/eve.json
+      - OUTPUT_DIR=/app/output
+      - ENABLE_EMAIL=false
+      - TAVILY_API_KEY=<REDACTED>
     working_dir: /app
     command: >
       bash -c "
         set -e &&
-        pip install chromadb psycopg2-binary langchain langchain-ollama &&
+        pip install chromadb psycopg2-binary langchain langchain-ollama requests &&
         python /app/chroma_setup.py &&
         python /app/postgres_setup.py &&
         python /app/main.py

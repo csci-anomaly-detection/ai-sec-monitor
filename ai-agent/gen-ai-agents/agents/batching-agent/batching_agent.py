@@ -1,11 +1,47 @@
-from langchain_ollama import ChatOllama
+import logging
 import os
 import re
 import ast
 import json
+from langchain_ollama import ChatOllama
 from pgres import run_query
 from chroma import query_chroma
 from check_relevance import check_vulnerability_relevance
+
+# ============================================================================
+# SETUP LOGGING TO FILE
+# ============================================================================
+log_file = os.path.expanduser('~/pipeline_user.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - BATCHING_AGENT - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
+
+# Create a logger for this module
+logger = logging.getLogger(__name__)
+
+# Redirect print to logger
+class PrintToLogger:
+    def __init__(self, log_func):
+        self.log_func = log_func
+    
+    def write(self, message):
+        if message.strip():
+            self.log_func(message.strip())
+    
+    def flush(self):
+        pass
+
+import sys
+sys.stdout = PrintToLogger(logger.info)
+sys.stderr = PrintToLogger(logger.error)
+
+# ============================================================================
+
 port = os.getenv("OLLAMA_PORT", "11434")
 llm = ChatOllama(
     model="llama3.1:8b",
