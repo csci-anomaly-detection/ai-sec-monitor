@@ -7,16 +7,31 @@ from pathlib import Path
 # Add paths for imports
 sys.path.insert(0, '/app')
 
+# Suppress httpx and other verbose loggers
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("chromadb.telemetry").setLevel(logging.WARNING)
+logging.getLogger("chromadb").setLevel(logging.WARNING)
+
 # Configure logging
+class HttpxFilter(logging.Filter):
+    def filter(self, record):
+        # Exclude all httpx, chromadb, and telemetry logs
+        excluded = ["httpx", "chromadb", "telemetry", "posthog"]
+        return not any(exc in record.name for exc in excluded)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/app/logs/pipeline.log'),
+        logging.FileHandler(os.path.expanduser('/app/logs/pipeline_user.log')),
         logging.StreamHandler()
     ]
 )
+
+# Apply filter to all handlers
 logger = logging.getLogger(__name__)
+for handler in logger.handlers:
+    handler.addFilter(HttpxFilter())
 
 # Import pipeline stages
 from pre_batch import process_and_store_batches
@@ -57,9 +72,12 @@ def stage_1_preprocessing(log_location: str) -> list:
         logger.info(f"📂 Processing logs from: {log_location}")
         batched_data = process_and_store_batches(log_location)
         
+        # Log FULL data without truncation
+        logger.info(f"📊 Stage 1 Output Data:")
+        logger.info(json.dumps(batched_data, indent=2, default=str))
+        
         if batched_data:
             logger.info(f"✅ Successfully batched {len(batched_data)} alert groups")
-            logger.debug(f"Batch preview: {batched_data[:2]}...")  # Show first 2 batches for debug
             return batched_data
         else:
             logger.warning("⚠️  No batched data returned from preprocessing")
@@ -82,7 +100,7 @@ def stage_2_batching_analysis(batched_data: list) -> list:
         
         logger.info(f"🤖 Running ReAct agent on {len(batched_data)} batches...")
         analysis_result = react_agent(batched_data=batched_data)
-        
+                
         # CLEAR OLLAMA CONTEXT before next stage
         logger.info("🧹 Clearing Ollama context...")
         _clear_ollama_context()
@@ -91,6 +109,10 @@ def stage_2_batching_analysis(batched_data: list) -> list:
         logger.info("🗺️  Mapping signatures to MITRE ATT&CK framework...")
         enriched_analysis = map_signatures_to_mitre(analysis_result)
         formatted_report = format_mitre_enriched_report(enriched_analysis)
+        
+        # Log FULL MITRE mapping output
+        logger.info(f"📊 Stage 2 MITRE Mapping Output:")
+        logger.info(json.dumps(formatted_report, indent=2, default=str))
         
         logger.info(f"✅ MITRE mapping complete - {len(formatted_report)} signatures enriched")
         
@@ -111,7 +133,7 @@ def _clear_ollama_context():
         # Send a reset/empty request to clear context
         url = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/generate"
         payload = {
-            "model": "llama3.1:8b",
+            "model": "qwen2.5:7b",
             "prompt": "",
             "context": []  # Empty context clears memory
         }
@@ -132,7 +154,7 @@ def stage_3_analyst_review(batching_analysis: dict) -> dict:
     try:
         logger.info("👨‍💼 Running analyst agent for detailed review...")
         final_report = analyze_threat(batching_analysis)
-        
+                
         if final_report:
             logger.info("✅ Analyst agent review complete")
             return final_report
@@ -153,6 +175,8 @@ def save_results(final_report: dict, output_dir: str = OUTPUT_DIR):
         with open(output_path, 'w') as f:
             json.dump(final_report, f, indent=2, default=str)
         logger.info(f"💾 Final report saved to: {output_path}")
+        logger.info(f"📊 Final Report Saved Data:")
+        logger.info(json.dumps(final_report, indent=2, default=str))
         return str(output_path)
     
     except Exception as e:
