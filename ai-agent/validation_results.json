@@ -1,0 +1,775 @@
+{
+  "summary": {
+    "total_threats": 4,
+    "feature_analyzer_classifications": {
+      "POSSIBLE_THREAT": 1,
+      "NEEDS_LLM_REVIEW": 3
+    },
+    "llm_validations_performed": 4,
+    "llm_decisions": {
+      "REAL_THREAT": 1,
+      "SUSPICIOUS": 3
+    },
+    "average_llm_latency_ms": 7774.78
+  },
+  "detailed_results": [
+    {
+      "threat": {
+        "ip": "198.51.100.25",
+        "severity": "HIGH",
+        "severity_level": 3,
+        "confidence_score": 0.4,
+        "attack_type": "Reconnaissance / Scanning",
+        "total_events": 80,
+        "rules_violated": [
+          {
+            "rule_id": "suricata_alert_storm",
+            "description": "High volume of Suricata alerts (>=10 in 4h)",
+            "severity": "high",
+            "count": 500,
+            "threshold": 10,
+            "window": "4h",
+            "matches": [
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.774194+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.774194+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 39297, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2100, \"signature\": \"Suspicious activity from 198.51.100.25 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2944\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 24, \"pkts_toclient\": 2, \"bytes_toserver\": 4463, \"bytes_toclient\": 1423, \"start\": \"2025-11-05T05:14:29.774194+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2100\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2100",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.774194+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.774194+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.825056+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.825056+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 60921, \"dest_port\": 22, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2221, \"signature\": \"Suspicious activity from 198.51.100.25 to port 22\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2100\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 32, \"pkts_toclient\": 5, \"bytes_toserver\": 2312, \"bytes_toclient\": 1540, \"start\": \"2025-11-05T05:14:29.825056+00:00\"}, \"app_proto\": \"ssh\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2221\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 22,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2221",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.825056+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.825056+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.850910+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.850910+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 33023, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2387, \"signature\": \"Suspicious activity from 198.51.100.25 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2601\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 17, \"pkts_toclient\": 7, \"bytes_toserver\": 2591, \"bytes_toclient\": 452, \"start\": \"2025-11-05T05:14:29.850910+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2387\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2387",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.850910+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.850910+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.863871+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.863871+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 52131, \"dest_port\": 22, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2415, \"signature\": \"Suspicious activity from 198.51.100.25 to port 22\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2579\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 45, \"pkts_toclient\": 14, \"bytes_toserver\": 1910, \"bytes_toclient\": 137, \"start\": \"2025-11-05T05:14:29.863871+00:00\"}, \"app_proto\": \"ssh\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2415\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 22,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2415",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.863871+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.863871+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.906219+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.906219+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 17286, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2608, \"signature\": \"Suspicious activity from 198.51.100.25 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2388\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 22, \"pkts_toclient\": 7, \"bytes_toserver\": 3674, \"bytes_toclient\": 600, \"start\": \"2025-11-05T05:14:29.906219+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2608\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2608",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.906219+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.906219+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.932405+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.932405+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 23050, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2507, \"signature\": \"Suspicious activity from 203.0.113.10 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2492\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 25, \"pkts_toclient\": 18, \"bytes_toserver\": 1330, \"bytes_toclient\": 666, \"start\": \"2025-11-05T05:14:29.932405+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2507\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2507",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.932405+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.932405+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.977137+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.977137+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 58890, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2813, \"signature\": \"Suspicious activity from 203.0.113.10 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2400\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 48, \"pkts_toclient\": 13, \"bytes_toserver\": 3346, \"bytes_toclient\": 559, \"start\": \"2025-11-05T05:14:29.977137+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2813\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2813",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.977137+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.977137+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.990511+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.990511+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 34242, \"dest_port\": 21, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2896, \"signature\": \"Suspicious activity from 203.0.113.10 to port 21\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2160\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 44, \"pkts_toclient\": 1, \"bytes_toserver\": 4364, \"bytes_toclient\": 1665, \"start\": \"2025-11-05T05:14:29.990511+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2896\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 21,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2896",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.990511+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.990511+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:30.036417+00:00\", \"@timestamp\": \"2025-11-05T05:14:30.036417+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 21953, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2962, \"signature\": \"Suspicious activity from 203.0.113.10 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2776\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 11, \"pkts_toclient\": 19, \"bytes_toserver\": 4674, \"bytes_toclient\": 1381, \"start\": \"2025-11-05T05:14:30.036417+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2962\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2962",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:30.036417+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:30.036417+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:30.085905+00:00\", \"@timestamp\": \"2025-11-05T05:14:30.085905+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 16913, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2567, \"signature\": \"Suspicious activity from 203.0.113.10 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2819\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 33, \"pkts_toclient\": 5, \"bytes_toserver\": 667, \"bytes_toclient\": 1547, \"start\": \"2025-11-05T05:14:30.085905+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2567\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2567",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:30.085905+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:30.085905+00:00"
+              }
+            ]
+          },
+          {
+            "rule_id": "suspicious_src_ip",
+            "description": "Single IP generating many alerts (>=5 in 4h)",
+            "severity": "high",
+            "group": "198.51.100.25",
+            "count": 80,
+            "threshold": 5,
+            "window": "4h",
+            "matches": [
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.774194+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.774194+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 39297, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2100, \"signature\": \"Suspicious activity from 198.51.100.25 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2944\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 24, \"pkts_toclient\": 2, \"bytes_toserver\": 4463, \"bytes_toclient\": 1423, \"start\": \"2025-11-05T05:14:29.774194+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2100\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2100",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.774194+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.774194+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.825056+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.825056+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 60921, \"dest_port\": 22, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2221, \"signature\": \"Suspicious activity from 198.51.100.25 to port 22\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2100\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 32, \"pkts_toclient\": 5, \"bytes_toserver\": 2312, \"bytes_toclient\": 1540, \"start\": \"2025-11-05T05:14:29.825056+00:00\"}, \"app_proto\": \"ssh\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2221\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 22,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2221",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.825056+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.825056+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.850910+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.850910+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 33023, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2387, \"signature\": \"Suspicious activity from 198.51.100.25 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2601\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 17, \"pkts_toclient\": 7, \"bytes_toserver\": 2591, \"bytes_toclient\": 452, \"start\": \"2025-11-05T05:14:29.850910+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2387\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2387",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.850910+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.850910+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.863871+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.863871+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 52131, \"dest_port\": 22, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2415, \"signature\": \"Suspicious activity from 198.51.100.25 to port 22\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2579\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 45, \"pkts_toclient\": 14, \"bytes_toserver\": 1910, \"bytes_toclient\": 137, \"start\": \"2025-11-05T05:14:29.863871+00:00\"}, \"app_proto\": \"ssh\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2415\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 22,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2415",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.863871+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.863871+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.906219+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.906219+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 17286, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2608, \"signature\": \"Suspicious activity from 198.51.100.25 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2388\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 22, \"pkts_toclient\": 7, \"bytes_toserver\": 3674, \"bytes_toclient\": 600, \"start\": \"2025-11-05T05:14:29.906219+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2608\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2608",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.906219+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.906219+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.932405+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.932405+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 23050, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2507, \"signature\": \"Suspicious activity from 203.0.113.10 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2492\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 25, \"pkts_toclient\": 18, \"bytes_toserver\": 1330, \"bytes_toclient\": 666, \"start\": \"2025-11-05T05:14:29.932405+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2507\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2507",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.932405+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.932405+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.977137+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.977137+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 58890, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2813, \"signature\": \"Suspicious activity from 203.0.113.10 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2400\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 48, \"pkts_toclient\": 13, \"bytes_toserver\": 3346, \"bytes_toclient\": 559, \"start\": \"2025-11-05T05:14:29.977137+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2813\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2813",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.977137+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.977137+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:29.990511+00:00\", \"@timestamp\": \"2025-11-05T05:14:29.990511+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 34242, \"dest_port\": 21, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2896, \"signature\": \"Suspicious activity from 203.0.113.10 to port 21\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2160\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 44, \"pkts_toclient\": 1, \"bytes_toserver\": 4364, \"bytes_toclient\": 1665, \"start\": \"2025-11-05T05:14:29.990511+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2896\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 21,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2896",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:29.990511+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:29.990511+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:30.036417+00:00\", \"@timestamp\": \"2025-11-05T05:14:30.036417+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 21953, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2962, \"signature\": \"Suspicious activity from 203.0.113.10 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 3, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2776\", \"severity\": 3, \"flow\": {\"pkts_toserver\": 11, \"pkts_toclient\": 19, \"bytes_toserver\": 4674, \"bytes_toclient\": 1381, \"start\": \"2025-11-05T05:14:30.036417+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2962\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2962",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:30.036417+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:30.036417+00:00"
+              },
+              {
+                "message": "{\"timestamp\": \"2025-11-05T05:14:30.085905+00:00\", \"@timestamp\": \"2025-11-05T05:14:30.085905+00:00\", \"event_type\": \"alert\", \"log_type\": \"alert\", \"src_ip\": \"198.51.100.25\", \"dest_ip\": \"10.77.0.20\", \"src_port\": 16913, \"dest_port\": 3389, \"proto\": \"TCP\", \"alert\": {\"signature_id\": 2567, \"signature\": \"Suspicious activity from 203.0.113.10 to port 3389\", \"category\": \"Attempted Attack\", \"severity\": 1, \"priority\": 1, \"gid\": 1, \"rev\": 1, \"action\": \"allowed\"}, \"status\": \"alert\", \"priority\": \"1\", \"gid\": \"1\", \"sid\": \"2819\", \"severity\": 1, \"flow\": {\"pkts_toserver\": 33, \"pkts_toclient\": 5, \"bytes_toserver\": 667, \"bytes_toclient\": 1547, \"start\": \"2025-11-05T05:14:30.085905+00:00\"}, \"app_proto\": \"tcp\", \"host\": \"suricata-honeypot\", \"in_iface\": \"eth0\", \"classification\": \"Attempted Attack\", \"reference\": \"url,example.com/attack-2567\"}",
+                "log_type": "alert",
+                "src_ip": "198.51.100.25",
+                "dest_ip": "10.77.0.20",
+                "dest_port": 3389,
+                "protocol": "TCP",
+                "priority": "1",
+                "gid": "1",
+                "sid": "2567",
+                "status": "alert",
+                "suricata_timestamp": "2025-11-05T05:14:30.085905+00:00",
+                "detected_level": "unknown",
+                "instance": "test-generator",
+                "job": "suricata",
+                "service_name": "suricata",
+                "@timestamp": "2025-11-05T05:14:30.085905+00:00"
+              }
+            ]
+          }
+        ],
+        "ml_anomalies": [],
+        "timestamps": [
+          "2025-11-05T05:14:29.774194+00:00",
+          "2025-11-05T05:14:29.825056+00:00",
+          "2025-11-05T05:14:29.850910+00:00",
+          "2025-11-05T05:14:29.863871+00:00",
+          "2025-11-05T05:14:29.906219+00:00",
+          "2025-11-05T05:14:29.932405+00:00",
+          "2025-11-05T05:14:29.977137+00:00",
+          "2025-11-05T05:14:29.990511+00:00",
+          "2025-11-05T05:14:30.036417+00:00",
+          "2025-11-05T05:14:30.085905+00:00",
+          "2025-11-05T05:14:29.774194+00:00",
+          "2025-11-05T05:14:29.825056+00:00",
+          "2025-11-05T05:14:29.850910+00:00",
+          "2025-11-05T05:14:29.863871+00:00",
+          "2025-11-05T05:14:29.906219+00:00",
+          "2025-11-05T05:14:29.932405+00:00",
+          "2025-11-05T05:14:29.977137+00:00",
+          "2025-11-05T05:14:29.990511+00:00",
+          "2025-11-05T05:14:30.036417+00:00",
+          "2025-11-05T05:14:30.085905+00:00"
+        ],
+        "src_ips": [
+          "198.51.100.25"
+        ],
+        "dest_ips": [
+          "10.77.0.20"
+        ],
+        "ports": [
+          3389,
+          22,
+          21
+        ]
+      },
+      "analysis": {
+        "classification": "POSSIBLE_THREAT",
+        "ml_confidence_score": 0.4,
+        "feature_analyzer_confidence_score": 0.8,
+        "llm_confidence_score": null,
+        "reasoning": "External IP with high severity rules",
+        "heuristic_flags": [
+          "off_hours",
+          "weekday",
+          "concentrated_timeline",
+          "external_to_internal",
+          "has_external_src",
+          "all_dest_internal",
+          "single_src_ip",
+          "high_request_rate",
+          "burst_activity",
+          "high_severity_rules"
+        ],
+        "analysis_results": {
+          "timing": {
+            "is_business_hours": false,
+            "is_maintenance_window": false,
+            "is_weekday": true,
+            "is_weekend": false,
+            "business_hours_ratio": 0.0,
+            "maintenance_window_ratio": 0.0,
+            "timestamp_count": 20,
+            "earliest_timestamp": "2025-11-05T05:14:29.774194+00:00",
+            "latest_timestamp": "2025-11-05T05:14:30.085905+00:00",
+            "flags": [
+              "off_hours",
+              "weekday",
+              "concentrated_timeline"
+            ]
+          },
+          "ip_reputation": {
+            "internal_src_ratio": 0.0,
+            "internal_dest_ratio": 1.0,
+            "all_src_internal": false,
+            "all_dest_internal": true,
+            "has_external_src": true,
+            "has_external_dest": false,
+            "src_ip_count": 1,
+            "dest_ip_count": 1,
+            "internal_to_internal": false,
+            "external_to_internal": true,
+            "flags": [
+              "external_to_internal",
+              "has_external_src",
+              "all_dest_internal",
+              "single_src_ip"
+            ]
+          },
+          "traffic": {
+            "total_events": 80,
+            "high_volume": false,
+            "very_high_volume": false,
+            "events_per_minute": 3849.719772481561,
+            "rule_violation_count": 2,
+            "total_rule_violations": 580,
+            "avg_rule_severity": 3.0,
+            "has_high_severity_rules": true,
+            "sustained_activity": false,
+            "burst_activity": true,
+            "flags": [
+              "high_request_rate",
+              "burst_activity",
+              "high_severity_rules"
+            ]
+          }
+        }
+      },
+      "llm_validation": {
+        "decision": "REAL_THREAT",
+        "confidence": 0.85,
+        "reasoning": "High severity rules, external IP, and burst activity indicate a potential attack.",
+        "proceed_to_analysis": true,
+        "validator_used": "llm_validator",
+        "llm_response_raw": "{\n  \"decision\": \"REAL_THREAT\",\n  \"confidence\": 0.85,\n  \"reasoning\": \"High severity rules, external IP, and burst activity indicate a potential attack.\",\n  \"proceed_to_analysis\": true\n}",
+        "errors": [],
+        "latency_ms": 11333.875894546509
+      }
+    },
+    {
+      "threat": {
+        "ip": "192.168.1.100",
+        "severity": "LOW",
+        "severity_level": 1,
+        "confidence_score": 0.1,
+        "attack_type": "Suspicious Activity",
+        "total_events": 180,
+        "rules_violated": [],
+        "ml_anomalies": [],
+        "timestamps": [],
+        "src_ips": [],
+        "dest_ips": [],
+        "ports": []
+      },
+      "analysis": {
+        "classification": "NEEDS_LLM_REVIEW",
+        "ml_confidence_score": 0.1,
+        "feature_analyzer_confidence_score": 0.5,
+        "llm_confidence_score": null,
+        "reasoning": "High volume",
+        "heuristic_flags": [
+          "no_timestamps",
+          "no_ips",
+          "high_volume"
+        ],
+        "analysis_results": {
+          "timing": {
+            "is_business_hours": false,
+            "is_maintenance_window": false,
+            "is_weekday": false,
+            "is_weekend": false,
+            "business_hours_ratio": 0.0,
+            "maintenance_window_ratio": 0.0,
+            "timestamp_count": 0,
+            "earliest_timestamp": null,
+            "latest_timestamp": null,
+            "flags": [
+              "no_timestamps"
+            ]
+          },
+          "ip_reputation": {
+            "internal_src_ratio": 0.0,
+            "internal_dest_ratio": 0.0,
+            "all_src_internal": false,
+            "all_dest_internal": false,
+            "has_external_src": false,
+            "has_external_dest": false,
+            "src_ip_count": 0,
+            "dest_ip_count": 0,
+            "internal_to_internal": false,
+            "external_to_internal": false,
+            "flags": [
+              "no_ips"
+            ]
+          },
+          "traffic": {
+            "total_events": 180,
+            "high_volume": true,
+            "very_high_volume": false,
+            "events_per_minute": 0.0,
+            "rule_violation_count": 0,
+            "total_rule_violations": 0,
+            "avg_rule_severity": 0.0,
+            "has_high_severity_rules": false,
+            "sustained_activity": false,
+            "burst_activity": false,
+            "flags": [
+              "high_volume"
+            ]
+          }
+        }
+      },
+      "llm_validation": {
+        "decision": "SUSPICIOUS",
+        "confidence": 0.6,
+        "reasoning": "High volume of activity with low ML confidence score, but no clear attack indicators or malicious patterns.",
+        "proceed_to_analysis": true,
+        "validator_used": "llm_validator",
+        "llm_response_raw": "{\n  \"decision\": \"SUSPICIOUS\",\n  \"confidence\": 0.60,\n  \"reasoning\": \"High volume of activity with low ML confidence score, but no clear attack indicators or malicious patterns.\",\n  \"proceed_to_analysis\": true\n}",
+        "errors": [],
+        "latency_ms": 6212.193012237549
+      }
+    },
+    {
+      "threat": {
+        "ip": "203.0.113.10",
+        "severity": "LOW",
+        "severity_level": 1,
+        "confidence_score": 0.1,
+        "attack_type": "Suspicious Activity",
+        "total_events": 180,
+        "rules_violated": [],
+        "ml_anomalies": [],
+        "timestamps": [],
+        "src_ips": [],
+        "dest_ips": [],
+        "ports": []
+      },
+      "analysis": {
+        "classification": "NEEDS_LLM_REVIEW",
+        "ml_confidence_score": 0.1,
+        "feature_analyzer_confidence_score": 0.5,
+        "llm_confidence_score": null,
+        "reasoning": "High volume",
+        "heuristic_flags": [
+          "no_timestamps",
+          "no_ips",
+          "high_volume"
+        ],
+        "analysis_results": {
+          "timing": {
+            "is_business_hours": false,
+            "is_maintenance_window": false,
+            "is_weekday": false,
+            "is_weekend": false,
+            "business_hours_ratio": 0.0,
+            "maintenance_window_ratio": 0.0,
+            "timestamp_count": 0,
+            "earliest_timestamp": null,
+            "latest_timestamp": null,
+            "flags": [
+              "no_timestamps"
+            ]
+          },
+          "ip_reputation": {
+            "internal_src_ratio": 0.0,
+            "internal_dest_ratio": 0.0,
+            "all_src_internal": false,
+            "all_dest_internal": false,
+            "has_external_src": false,
+            "has_external_dest": false,
+            "src_ip_count": 0,
+            "dest_ip_count": 0,
+            "internal_to_internal": false,
+            "external_to_internal": false,
+            "flags": [
+              "no_ips"
+            ]
+          },
+          "traffic": {
+            "total_events": 180,
+            "high_volume": true,
+            "very_high_volume": false,
+            "events_per_minute": 0.0,
+            "rule_violation_count": 0,
+            "total_rule_violations": 0,
+            "avg_rule_severity": 0.0,
+            "has_high_severity_rules": false,
+            "sustained_activity": false,
+            "burst_activity": false,
+            "flags": [
+              "high_volume"
+            ]
+          }
+        }
+      },
+      "llm_validation": {
+        "decision": "SUSPICIOUS",
+        "confidence": 0.6,
+        "reasoning": "High volume of activity with low ML confidence score, but no clear attack indicators or malicious patterns.",
+        "proceed_to_analysis": true,
+        "validator_used": "llm_validator",
+        "llm_response_raw": "{\n  \"decision\": \"SUSPICIOUS\",\n  \"confidence\": 0.60,\n  \"reasoning\": \"High volume of activity with low ML confidence score, but no clear attack indicators or malicious patterns.\",\n  \"proceed_to_analysis\": true\n}",
+        "errors": [],
+        "latency_ms": 6209.864854812622
+      }
+    },
+    {
+      "threat": {
+        "ip": "185.220.101.32",
+        "severity": "LOW",
+        "severity_level": 1,
+        "confidence_score": 0.0,
+        "attack_type": "Suspicious Activity",
+        "total_events": 60,
+        "rules_violated": [],
+        "ml_anomalies": [],
+        "timestamps": [],
+        "src_ips": [],
+        "dest_ips": [],
+        "ports": []
+      },
+      "analysis": {
+        "classification": "NEEDS_LLM_REVIEW",
+        "ml_confidence_score": 0.0,
+        "feature_analyzer_confidence_score": 0.5,
+        "llm_confidence_score": null,
+        "reasoning": "Ambiguous pattern - requires LLM analysis",
+        "heuristic_flags": [
+          "no_timestamps",
+          "no_ips"
+        ],
+        "analysis_results": {
+          "timing": {
+            "is_business_hours": false,
+            "is_maintenance_window": false,
+            "is_weekday": false,
+            "is_weekend": false,
+            "business_hours_ratio": 0.0,
+            "maintenance_window_ratio": 0.0,
+            "timestamp_count": 0,
+            "earliest_timestamp": null,
+            "latest_timestamp": null,
+            "flags": [
+              "no_timestamps"
+            ]
+          },
+          "ip_reputation": {
+            "internal_src_ratio": 0.0,
+            "internal_dest_ratio": 0.0,
+            "all_src_internal": false,
+            "all_dest_internal": false,
+            "has_external_src": false,
+            "has_external_dest": false,
+            "src_ip_count": 0,
+            "dest_ip_count": 0,
+            "internal_to_internal": false,
+            "external_to_internal": false,
+            "flags": [
+              "no_ips"
+            ]
+          },
+          "traffic": {
+            "total_events": 60,
+            "high_volume": false,
+            "very_high_volume": false,
+            "events_per_minute": 0.0,
+            "rule_violation_count": 0,
+            "total_rule_violations": 0,
+            "avg_rule_severity": 0.0,
+            "has_high_severity_rules": false,
+            "sustained_activity": false,
+            "burst_activity": false,
+            "flags": []
+          }
+        }
+      },
+      "llm_validation": {
+        "decision": "SUSPICIOUS",
+        "confidence": 0.75,
+        "reasoning": "The FeatureAnalyzer classified this as 'NEEDS_LLM_REVIEW' due to an ambiguous pattern, and while there are no clear attack indicators, the ML confidence is low (0.00) which suggests caution.",
+        "proceed_to_analysis": true,
+        "validator_used": "llm_validator",
+        "llm_response_raw": "{\n  \"decision\": \"SUSPICIOUS\",\n  \"confidence\": 0.75,\n  \"reasoning\": \"The FeatureAnalyzer classified this as 'NEEDS_LLM_REVIEW' due to an ambiguous pattern, and while there are no clear attack indicators, the ML confidence is low (0.00) which suggests caution.\",\n  \"proceed_to_analysis\": true\n}",
+        "errors": [],
+        "latency_ms": 7343.19806098938
+      }
+    }
+  ]
+}

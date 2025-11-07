@@ -9,11 +9,12 @@ import os
 from datetime import datetime, UTC, timezone
 from typing import List, Dict, Any
 from pathlib import Path
-
+from dotenv import load_dotenv
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
+# Load environment variables from .env file
+load_dotenv()
 class ContinuousLogGenerator:
     """
     Generates continuous attack simulation logs for testing real-time processor.
