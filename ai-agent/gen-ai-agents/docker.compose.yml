@@ -1,0 +1,84 @@
+services:
+  chroma:
+    image: ghcr.io/chroma-core/chroma:latest
+    container_name: chroma
+    ports:
+      - "1563:8000"
+    environment:
+      - ANONYMIZED_TELEMETRY=false
+    volumes:
+      - ./chroma-data:/chroma
+    restart: unless-stopped
+
+  agent:
+    image: python:3.11-slim
+    container_name: ai_analysis
+    depends_on:
+      - chroma
+    volumes:
+      - ./logs:/app/logs
+      - ./agents/tools/pgres.py:/app/pgres.py
+      - ./agents/tools/chroma.py:/app/chroma.py
+      - ./agents/tools/check_relevance.py:/app/check_relevance.py
+      - ./agents/batching-agent/batching_agent.py:/app/batching_agent.py
+      - ./agents/batching-agent/pre_batch.py:/app/pre_batch.py
+      - ./agents/batching-agent/preprocessor.py:/app/preprocessor.py
+      - ./python-files/chroma_setup.py:/app/chroma_setup.py
+      - ./python-files/postgres_setup.py:/app/postgres_setup.py
+      - ./python-files/main.py:/app/main.py
+      - ./python-files/test_analyst_agent.py:/app/test_analyst_agent.py
+      - ./demo_batch.json:/app/demo_batch.json
+      - ./agents/analyst-agent/analyst_agent.py:/app/analyst_agent.py
+      - ./agents/analyst-agent/email_agent.py:/app/email_agent.py
+      - ./agents/batching-agent/mitre_mapper.py:/app/mitre_mapper.py
+      - ./agents/tools/websearch.py:/app/websearch.py
+      - ./pip-cache:/root/.cache/pip
+      - ./output:/app/output
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=myuser
+      - POSTGRES_PASSWORD=mypassword
+      - POSTGRES_DB=alertsdb
+      - OLLAMA_PORT=11434
+      - PYTHONPATH=/app
+      - LOG_LOCATION=/app/logs/eve.json
+      - OUTPUT_DIR=/app/output
+      - ENABLE_EMAIL=false
+      - TAVILY_API_KEY=<REDACTED>
+    working_dir: /app
+    command: >
+      bash -c "
+        set -e &&
+        pip install chromadb psycopg2-binary langchain langchain-ollama requests &&
+        python /app/chroma_setup.py &&
+        python /app/postgres_setup.py &&
+        python /app/main.py
+      "
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: alertsdb
+    ports:
+      - "1562:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "1561:11434"
+    volumes:
+      - ./ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      # - CUDA_VISIBLE_DEVICES=1
+    restart: unless-stopped
+    gpus: all
