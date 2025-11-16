@@ -1,6 +1,7 @@
 # This file sets up chromaDB along with suricata rule, mitre attack mappings
 import chromadb
 import os
+
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
@@ -55,47 +56,158 @@ suricata_col.add(
     metadatas=suricata_rules
 )
 
-# Example: Add MITRE ATT&CK techniques
-mitre_techniques = [
-    {
-        "technique_id": "T1046",
-        "name": "Network Service Scanning",
-        "description": "Adversaries may scan for network services to identify available services, ports, and hosts for later exploitation."
+# Create a collection for attack and mitigation knowledge
+knowledge_col = client.get_or_create_collection("attack_mitigation_knowledge")
+
+# Example: Add attack and mitigation entries
+attack_mitigation_docs = [
+        {
+        "id": "mitigation_http_syn_scan",
+        "attack": "HTTP SYN Scan / Service Probing",
+        "description": "Multiple repeated SYN packets sent to TCP port 80 of the DMZ web server, indicating reconnaissance or a pre-attack scan to enumerate open services.",
+        "mitigation": [
+            "Enable SYN flood protection on the firewall or IPS",
+            "Rate-limit repeated SYN packets from the same source",
+            "Block or alert on abnormal connection attempts from the suspicious host",
+            "Ensure web server is behind a reverse proxy or WAF",
+            "Monitor logs for early reconnaissance behaviors"
+        ]
     },
     {
-        "technique_id": "T1190",
-        "name": "Exploit Public-Facing Application",
-        "description": "Adversaries may exploit vulnerabilities in public-facing applications to gain access to internal systems."
+        "id": "mitigation_sql_union",
+        "attack": "SQL Injection Attempt - UNION operator",
+        "description": "Attacker attempted to extract or modify database content using SQL UNION-based injection techniques.",
+        "mitigation": [
+            "Use parameterized queries or prepared statements",
+            "Enable strict input validation and sanitization",
+            "Deploy a Web Application Firewall (WAF) with SQLi signatures enabled",
+            "Conduct code reviews for vulnerable database calls",
+            "Enable least-privilege permissions for database accounts"
+        ]
     },
     {
-        "technique_id": "T1059",
-        "name": "Command and Scripting Interpreter",
-        "description": "Adversaries may abuse command and script interpreters to execute arbitrary commands or scripts on a system."
+        "id": "mitigation_sql_or_true",
+        "attack": "SQL Injection Attempt - OR 1=1",
+        "description": "Attacker attempted authentication bypass or data extraction using always-true SQL logic ('OR 1=1').",
+        "mitigation": [
+            "Implement server-side input sanitization",
+            "Enforce strong authentication controls",
+            "Use stored procedures or ORM frameworks",
+            "Deploy WAF filtering for logical SQLi payloads",
+            "Perform regular vulnerability scanning of web inputs"
+        ]
     },
     {
-        "technique_id": "T1006",
-        "name": "File and Directory Discovery",
-        "description": "Adversaries may enumerate files and directories to discover information about the system and its contents."
+        "id": "mitigation_http_bruteforce",
+        "attack": "HTTP Brute Force Login Attempt",
+        "description": "Automated rapid login attempts against a web application's authentication endpoint.",
+        "mitigation": [
+            "Implement account lockout & throttling",
+            "Use CAPTCHA on login pages",
+            "Monitor for rapid repeated login failures",
+            "Deploy WAF brute-force detection rules",
+            "Enable MFA for all user accounts"
+        ]
     },
     {
-        "technique_id": "T1105",
-        "name": "Ingress Tool Transfer",
-        "description": "Adversaries may transfer tools or files into a compromised environment to facilitate further operations."
+        "id": "mitigation_xss_script_tag",
+        "attack": "Cross-Site Scripting (XSS) - Script Tag Injection",
+        "description": "Attacker attempted to inject `<script>` tags into web inputs to execute malicious JavaScript.",
+        "mitigation": [
+            "Apply output encoding (HTML/JavaScript encoding)",
+            "Filter script tags and dangerous characters server-side",
+            "Deploy Content Security Policy (CSP)",
+            "Use WAF rules for XSS payload detection",
+            "Sanitize user-generated content before rendering"
+        ]
     },
     {
-        "technique_id": "T1505",
-        "name": "Web Shell",
-        "description": "Adversaries may deploy web shells to compromised web servers for remote access and control."
+        "id": "mitigation_xss_js_event",
+        "attack": "Cross-Site Scripting (XSS) - JavaScript Event Injection",
+        "description": "Attack attempt using JavaScript event handlers such as `onload`, `onclick`, etc.",
+        "mitigation": [
+            "Sanitize dangerous attributes (e.g., onload, onclick)",
+            "Use whitelist-style input validation",
+            "Enable CSP to restrict inline scripts",
+            "Harden templates to prevent event handler injection",
+            "Deploy WAF with XSS behavioral detection"
+        ]
     },
     {
-        "technique_id": "T1110",
-        "name": "Brute Force",
-        "description": "Adversaries may use brute force techniques to attempt to gain access to accounts by guessing passwords."
+        "id": "mitigation_xss_img_tag",
+        "attack": "Cross-Site Scripting (XSS) - IMG Tag Injection",
+        "description": "Use of `<img>` tags with JavaScript attributes or malformed sources to trigger XSS.",
+        "mitigation": [
+            "Strip JavaScript URIs and harmful attributes from image tags",
+            "Encode user-supplied HTML",
+            "Implement CSP to disallow inline scripts",
+            "Validate allowed HTML elements using a sanitizer library",
+            "Monitor for anomalous client-side behavior"
+        ]
+    },
+    {
+        "id": "mitigation_command_injection",
+        "attack": "Command Injection Attempt - System File Access",
+        "description": "Attacker attempted to execute system-level commands or access OS-level files through input fields.",
+        "mitigation": [
+            "Do not pass user input into system calls directly",
+            "Sanitize shell metacharacters (| ; & ` $ < >)",
+            "Run web applications with minimal OS privileges",
+            "Use allowlists for permitted commands or parameters",
+            "Deploy runtime protection (e.g., mod_security, AppArmor)"
+        ]
+    },
+    {
+        "id": "mitigation_dir_traversal_passwd",
+        "attack": "Directory Traversal - Sensitive File Access (e.g., /etc/passwd)",
+        "description": "Attacker attempted directory traversal using ../ sequences to access system files such as /etc/passwd.",
+        "mitigation": [
+            "Normalize and validate file paths",
+            "Block traversal sequences like ../ server-side",
+            "Restrict file system permissions for the web service",
+            "Use chroot or containerized environments",
+            "Monitor logs for repeated traversal attempts"
+        ]
+    },
+    {
+        "id": "mitigation_dir_traversal_general",
+        "attack": "Directory Traversal Attempt (General)",
+        "description": "General attempt to escape the intended directory to access unauthorized files.",
+        "mitigation": [
+            "Validate and sanitize path inputs",
+            "Enforce allowlists for file-access endpoints",
+            "Disable direct filesystem access from user input",
+            "Use WAF signatures for traversal payloads",
+            "Implement OS-level hardening"
+        ]
+    },
+    {
+        "id": "mitigation_webshell_upload",
+        "attack": "Web Shell Upload Attempt",
+        "description": "Attacker attempted to upload a malicious script (web shell) to gain remote command execution.",
+        "mitigation": [
+            "Restrict uploaded file types using strict MIME and extension checks",
+            "Store uploaded files outside the web root",
+            "Scan uploaded files for malicious content",
+            "Disable execution permissions on upload directories",
+            "Monitor for suspicious file creation events"
+        ]
     }
+
 ]
 
-mitre_col.add(
-    ids=[t["technique_id"] for t in mitre_techniques],
-    documents=[t["description"] for t in mitre_techniques],
-    metadatas=mitre_techniques
+def flatten_metadata(doc):
+    meta = doc.copy()
+    # Convert mitigation list to a string
+    if isinstance(meta.get("mitigation"), list):
+        meta["mitigation"] = "; ".join(meta["mitigation"])
+    return meta
+
+knowledge_col.add(
+    ids=[doc["id"] for doc in attack_mitigation_docs],
+    documents=[
+        f"Attack: {doc['attack']}\nDescription: {doc['description']}\nMitigation: {', '.join(doc['mitigation'])}"
+        for doc in attack_mitigation_docs
+    ],
+    metadatas=[flatten_metadata(doc) for doc in attack_mitigation_docs]
 )

@@ -12,15 +12,19 @@ def create_table():
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS alert_batches (
-            batch_id SERIAL PRIMARY KEY,
-            signature_id INT NOT NULL,
-            signature TEXT NOT NULL,
-            mitre_id TEXT,
-            alert_count INT NOT NULL,
-            src_ips JSONB,
-            dst_ips JSONB,
-            first_seen TIMESTAMP,
-            last_seen TIMESTAMP,
+            id SERIAL PRIMARY KEY,
+            source_ip VARCHAR(50),
+            dest_ip VARCHAR(50),
+            severity VARCHAR(20),
+            confidence_score FLOAT,
+            attack_types TEXT,
+            total_events INT,
+            rules_violated TEXT,
+            timestamps TEXT,
+            src_ips TEXT,
+            dest_ips TEXT,
+            ports TEXT,
+            batch_time TIMESTAMP DEFAULT NOW(),
             created_at TIMESTAMP DEFAULT NOW()
         );
     """)
