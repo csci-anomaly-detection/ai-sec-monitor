@@ -20,8 +20,6 @@ services:
       - ./agents/tools/pgres.py:/app/pgres.py
       - ./agents/tools/chroma.py:/app/chroma.py
       - ./agents/tools/check_relevance.py:/app/check_relevance.py
-      - ./agents/batching-agent/pre_batch.py:/app/pre_batch.py
-      - ./agents/batching-agent/preprocessor.py:/app/preprocessor.py
       - ./python-files/chroma_setup.py:/app/chroma_setup.py
       - ./python-files/postgres_setup.py:/app/postgres_setup.py
       - ./python-files/main.py:/app/main.py

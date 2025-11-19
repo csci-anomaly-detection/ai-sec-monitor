@@ -56,7 +56,6 @@ def print_info_box(content_lines, color=Colors.BLUE):
     """Print info in a colored box"""
     print(f"{color}┌{'─' * 78}┐{Colors.ENDC}")
     for line in content_lines:
-        # Truncate long lines
         line = str(line)[:76]
         print(f"{color}│{Colors.ENDC} {line:<76} {color}│{Colors.ENDC}")
     print(f"{color}└{'─' * 78}┘{Colors.ENDC}\n")
@@ -94,19 +93,105 @@ def trim_messages(messages, max_messages=10):
 
 
 # ============================================================================
+# EXTRACT THREAT DATA FROM VALIDATION FORMAT
+# ============================================================================
+
+def extract_threat_from_validation_result(validation_result: dict) -> dict:
+    """
+    Extract threat data from validation orchestrator result format.
+    
+    Args:
+        validation_result: Dict with 'threat', 'analysis', 'llm_validation' keys
+    
+    Returns:
+        Normalized threat dict for analysis
+    """
+    threat_data = validation_result.get("threat", {})
+    analysis = validation_result.get("analysis", {})
+    llm_validation = validation_result.get("llm_validation", {})
+    
+    # Extract key fields
+    ip = threat_data.get("ip", "unknown")
+    attack_type = threat_data.get("attack_type", "unknown")
+    severity = threat_data.get("severity", "LOW")
+    total_events = threat_data.get("total_events", 0)
+    
+    # Get classification info
+    fa_classification = analysis.get("classification", "UNKNOWN")
+    llm_decision = llm_validation.get("decision", "UNKNOWN")
+    
+    # Extract IPs and ports
+    src_ips = threat_data.get("src_ips", [ip])
+    dest_ips = threat_data.get("dest_ips", [])
+    ports = threat_data.get("ports", [])
+    
+    # Extract signature IDs from rules violated
+    signature_ids = []
+    for rule in threat_data.get("rules_violated", []):
+        if "rule_id" in rule:
+            signature_ids.append(str(rule["rule_id"]))
+    
+    # Determine if this should be analyzed
+    proceed_to_analysis = llm_validation.get("proceed_to_analysis", True)
+    if fa_classification == "FALSE_POSITIVE":
+        proceed_to_analysis = False
+    
+    return {
+        "ip": ip,
+        "attack_type": attack_type,
+        "severity": severity,
+        "total_events": total_events,
+        "classification": fa_classification,
+        "llm_decision": llm_decision,
+        "proceed_to_analysis": proceed_to_analysis,
+        "src_ips": src_ips,
+        "dest_ips": dest_ips,
+        "ports": ports,
+        "signature_ids": signature_ids,
+        "rules_violated": threat_data.get("rules_violated", []),
+        "confidence_score": threat_data.get("confidence_score", 0.5),
+        "timestamps": threat_data.get("timestamps", []),
+        "heuristic_flags": analysis.get("heuristic_flags", []),
+        "llm_reasoning": llm_validation.get("reasoning", ""),
+        "validation_result": validation_result  # Keep original for reference
+    }
+
+
+# ============================================================================
 # HIERARCHICAL CLUSTERING APPROACH
 # ============================================================================
 
-def analyze_all_threats_batch(all_threats, max_retries=20):
+def analyze_all_threats_batch(validated_results, max_retries=20):
     """
     Three-tier hierarchical analysis: Cluster → Investigate → Synthesize
+    
+    Args:
+        validated_results: List of validation results from ValidationOrchestrator
     """
     
     print(f"\n{Colors.BOLD}{Colors.GREEN}{'█' * 80}{Colors.ENDC}")
     print(f"{Colors.BOLD}{Colors.GREEN}█  🎯 HIERARCHICAL THREAT ANALYSIS STARTED{' ' * (35)}{Colors.ENDC}{Colors.GREEN}█{Colors.ENDC}{Colors.BOLD}")
     print(f"{Colors.GREEN}{'█' * 80}{Colors.ENDC}\n")
     
-    print_info_box([f"📊 Total threats to analyze: {len(all_threats)}"], Colors.CYAN)
+    # Extract threats from validation results
+    all_threats = []
+    for result in validated_results:
+        threat = extract_threat_from_validation_result(result)
+        # Only analyze threats that passed validation
+        if threat["proceed_to_analysis"]:
+            all_threats.append(threat)
+    
+    print_info_box([
+        f"📊 Total validated results: {len(validated_results)}",
+        f"📊 Threats for analysis: {len(all_threats)}"
+    ], Colors.CYAN)
+    
+    if not all_threats:
+        print_info_box([
+            f"⚠️  No threats require analysis",
+            f"   All alerts were filtered as false positives or benign"
+        ], Colors.YELLOW)
+        return build_empty_report()
     
     # ========================================================================
     # TIER 1: CLUSTERING - Group similar threats (NO LLM)
@@ -152,7 +237,7 @@ def cluster_threats_by_pattern(all_threats):
         attack_type = threat.get("attack_type", "unknown")
         
         # Normalize attack type for better clustering
-        attack_type_normalized = attack_type.lower().strip()
+        attack_type_normalized = attack_type.lower().strip().replace(" ", "_")
         
         # Cluster key: IP + primary attack type
         cluster_key = f"{ip}_{attack_type_normalized}"
@@ -196,23 +281,37 @@ def investigate_cluster(cluster_key, cluster_threats, max_tools=3):
     """
     ip, attack_type = cluster_key.split("_", 1)
     
+    # Aggregate severity (use highest)
+    severity_map = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
+    max_severity = max(
+        (severity_map.get(t.get("severity", "LOW"), 1) for t in cluster_threats),
+        default=1
+    )
+    
+    # Collect all signature IDs
+    all_signature_ids = set()
+    for t in cluster_threats:
+        all_signature_ids.update(t.get("signature_ids", []))
+    
+    # Count total events
+    total_events = sum(t.get("total_events", 1) for t in cluster_threats)
+    
     investigation = {
         "cluster_id": cluster_key,
         "ip": ip,
-        "attack_type": attack_type,
+        "attack_type": attack_type.replace("_", " "),
         "threat_count": len(cluster_threats),
-        "severity": max((t.get("severity", 0) for t in cluster_threats), default=0),
-        "signature_ids": list(set(
-            sid for t in cluster_threats 
-            for sid in t.get("signature_ids", [])
-        )),
+        "total_events": total_events,
+        "severity": max_severity,
+        "signature_ids": list(all_signature_ids),
         "tool_findings": []
     }
     
     findings = [
         f"IP: {ip}",
-        f"Attack Type: {attack_type}",
-        f"Threat Count: {len(cluster_threats)}"
+        f"Attack Type: {attack_type.replace('_', ' ')}",
+        f"Threat Count: {len(cluster_threats)}",
+        f"Total Events: {total_events}"
     ]
     
     # Tool 1: Check historical data for this IP
@@ -229,16 +328,16 @@ def investigate_cluster(cluster_key, cluster_threats, max_tools=3):
         findings.append(f"🔧 Tool 1 (ChromaQuery): ✗ Failed")
     
     # Tool 2: Semantic search for similar attacks (only for significant clusters)
-    if len(cluster_threats) > 5:
+    if len(cluster_threats) >= 1 or total_events > 10:
         try:
             semantic_result = query_chroma_semantic(
-                f"{attack_type} attack pattern", 
+                f"{attack_type.replace('_', ' ')} attack pattern", 
                 collection_name="attack_mitigation_knowledge", 
                 top_k=3
             )
             finding = {
                 "tool": "SemanticSearch",
-                "query": attack_type,
+                "query": attack_type.replace("_", " "),
                 "result": semantic_result[:500] if semantic_result else "No similar patterns found"
             }
             investigation["tool_findings"].append(finding)
@@ -246,13 +345,13 @@ def investigate_cluster(cluster_key, cluster_threats, max_tools=3):
         except Exception as e:
             findings.append(f"🔧 Tool 2 (SemanticSearch): ✗ Failed")
     
-    # Tool 3: Web research (only for top 3 largest clusters)
-    if len(cluster_threats) > 10:
+    # Tool 3: Web research (only for top clusters)
+    if total_events > 50 or max_severity >= 3:
         try:
-            web_result = websearch(f"{attack_type} CVE mitigation strategies")
+            web_result = websearch(f"{attack_type.replace('_', ' ')} CVE mitigation strategies")
             finding = {
                 "tool": "WebSearch",
-                "query": f"{attack_type} mitigation",
+                "query": f"{attack_type.replace('_', ' ')} mitigation",
                 "result": web_result[:500] if web_result else "No CVE data found"
             }
             investigation["tool_findings"].append(finding)
@@ -272,23 +371,19 @@ def sanitize_json_string(json_str):
     """
     import re
     
-    # Replace single quotes with double quotes for array/dict values
-    # But be careful not to replace quotes inside string values
-    
     # Pattern 1: ['item1', 'item2'] -> ["item1", "item2"]
     json_str = re.sub(r"\['([^']*?)'\]", r'["\1"]', json_str)
     json_str = re.sub(r"\['([^']*?)',\s*'([^']*?)'\]", r'["\1", "\2"]', json_str)
     
     # Pattern 2: Single quotes around keys and values
-    # Replace: 'key': 'value' -> "key": "value"
     json_str = re.sub(r"'([^']*?)'\s*:\s*'([^']*?)'", r'"\1": "\2"', json_str)
     
-    # Pattern 3: Arrays with single quotes: ['a', 'b', 'c']
+    # Pattern 3: Arrays with single quotes
     json_str = re.sub(r":\s*\['([^']*?)'\]", r': ["\1"]', json_str)
     json_str = re.sub(r":\s*\['([^']*?)',\s*'([^']*?)'\]", r': ["\1", "\2"]', json_str)
     json_str = re.sub(r":\s*\['([^']*?)',\s*'([^']*?)',\s*'([^']*?)'\]", r': ["\1", "\2", "\3"]', json_str)
     
-    # Pattern 4: Dict with single quotes: {'LOW': 244, 'HIGH': 2}
+    # Pattern 4: Dict with single quotes
     json_str = re.sub(r"\{'([^']*?)'\s*:\s*(\d+)\}", r'{"\1": \2}', json_str)
     json_str = re.sub(r"\{'([^']*?)'\s*:\s*(\d+),\s*'([^']*?)'\s*:\s*(\d+)\}", r'{"\1": \2, "\3": \4}', json_str)
     
@@ -307,21 +402,24 @@ def synthesize_final_report(cluster_analyses, all_threats, clusters):
     attack_types = Counter()
     severity_distribution = Counter()
     all_signature_ids = set()
+    llm_decisions = Counter()
     
     for cluster_key, cluster_threats in clusters.items():
         ip, attack_type = cluster_key.split("_", 1)
         unique_ips.add(ip)
-        attack_types[attack_type] += len(cluster_threats)
+        attack_types[attack_type.replace("_", " ")] += len(cluster_threats)
         
         for threat in cluster_threats:
-            severity = threat.get("severity", 0)
-            if severity >= 3:
-                severity_distribution["HIGH"] += 1
-            elif severity >= 2:
-                severity_distribution["MEDIUM"] += 1
-            else:
-                severity_distribution["LOW"] += 1
+            # Map severity to categories
+            severity = threat.get("severity", "LOW")
+            severity_distribution[severity] += 1
             
+            # Track LLM decisions
+            llm_decision = threat.get("llm_decision", "UNKNOWN")
+            if llm_decision != "UNKNOWN":
+                llm_decisions[llm_decision] += 1
+            
+            # Collect signature IDs
             for sid in threat.get("signature_ids", []):
                 all_signature_ids.add(str(sid))
     
@@ -333,6 +431,7 @@ def synthesize_final_report(cluster_analyses, all_threats, clusters):
             "ip": analysis["ip"],
             "attack_type": analysis["attack_type"],
             "threat_count": analysis["threat_count"],
+            "total_events": analysis["total_events"],
             "severity": analysis["severity"],
             "findings": [f["result"][:200] for f in analysis["tool_findings"]]
         })
@@ -344,6 +443,7 @@ THREAT LANDSCAPE SUMMARY:
 - Unique Attackers: {len(unique_ips)}
 - Attack Categories: {len(attack_types)}
 - Severity Distribution: {dict(severity_distribution)}
+- LLM Validation Decisions: {dict(llm_decisions)}
 
 TOP CLUSTER INVESTIGATIONS:
 {json.dumps(cluster_summary, indent=2)}
@@ -407,22 +507,15 @@ CRITICAL: Output MUST be valid JSON starting with {{ and ending with }}. No mark
         response = llm.invoke(messages)
         content = response.content.strip()
         
-        # Try to extract JSON from response - more flexible approach
+        # Try to extract JSON from response
         final = None
         
-        # Method 1: Look for Final Answer prefix
         if "Final Answer:" in content:
             final = content.split("Final Answer:")[-1].strip()
-        
-        # Method 2: Look for JSON block markers
         elif "```json" in content:
             final = content.split("```json")[-1].split("```")[0].strip()
-        
-        # Method 3: Look for plain JSON (starts with {)
         elif content.strip().startswith("{"):
             final = content.strip()
-        
-        # Method 4: Try to find { and } boundaries
         else:
             start_idx = content.find("{")
             end_idx = content.rfind("}")
@@ -431,7 +524,6 @@ CRITICAL: Output MUST be valid JSON starting with {{ and ending with }}. No mark
         
         if not final:
             print_info_box([f"❌ Could not extract JSON from LLM output"], Colors.RED)
-            print_info_box([f"Full content: {content[:300]}..."], Colors.RED)
             return build_report_from_clusters(cluster_analyses, total_threats, unique_ips, attack_types, severity_distribution, all_signature_ids)
         
         # Clean up JSON
@@ -439,7 +531,7 @@ CRITICAL: Output MUST be valid JSON starting with {{ and ending with }}. No mark
         if final.startswith('json'):
             final = final[4:].strip()
         
-        # SANITIZE JSON - Convert single quotes to double quotes
+        # SANITIZE JSON
         final = sanitize_json_string(final)
         
         # Parse JSON
@@ -453,7 +545,6 @@ CRITICAL: Output MUST be valid JSON starting with {{ and ending with }}. No mark
         missing_fields = [f for f in required_fields if f not in final_json]
         
         if missing_fields:
-            # Enhance with missing fields from clusters
             if 'attack_timeline' not in final_json:
                 final_json['attack_timeline'] = f"Attack campaign spanning {total_threats} events from {len(unique_ips)} sources"
         
@@ -491,18 +582,19 @@ def build_report_from_clusters(cluster_analyses, total_threats, unique_ips, atta
             "clusters_analyzed": len(cluster_analyses)
         },
         "key_findings": [
-            f"Cluster {idx+1}: {c['threat_count']} {c['attack_type']} attacks from {c['ip']}"
+            f"Cluster {idx+1}: {c['total_events']} events ({c['attack_type']} from {c['ip']})"
             for idx, c in enumerate(top_clusters)
         ] + [
             f"Total {len(unique_ips)} unique attacker IPs",
-            f"Most common: {attack_types.most_common(1)[0][0]} ({attack_types.most_common(1)[0][1]} attacks)"
+            f"Most common: {attack_types.most_common(1)[0][0]} ({attack_types.most_common(1)[0][1]} threats)"
         ],
         "threat_actors": [
             {
                 "ip": c["ip"],
                 "attack_types": [c["attack_type"]],
                 "threat_count": c["threat_count"],
-                "sophistication": "HIGH" if c["threat_count"] > 50 else "MEDIUM",
+                "total_events": c["total_events"],
+                "sophistication": "HIGH" if c["total_events"] > 100 else "MEDIUM",
                 "threat_level": "HIGH" if c["severity"] >= 3 else "MEDIUM"
             }
             for c in top_clusters
@@ -513,7 +605,7 @@ def build_report_from_clusters(cluster_analyses, total_threats, unique_ips, atta
             "attack_patterns": list(attack_types.keys())
         },
         "immediate_actions": [
-            f"🚨 Block {c['ip']} ({c['threat_count']} attacks)"
+            f"🚨 Block {c['ip']} ({c['total_events']} events)"
             for c in top_clusters[:3]
         ] + [
             "Enable WAF rules",
@@ -530,5 +622,42 @@ def build_report_from_clusters(cluster_analyses, total_threats, unique_ips, atta
             "overall_risk": "HIGH" if severity_distribution.get('HIGH', 0) > 10 else "MEDIUM",
             "confidence": 0.85,
             "reasoning": f"Hierarchical cluster analysis of {len(cluster_analyses)} patterns with tool investigation"
+        }
+    }
+
+
+def build_empty_report():
+    """Build report when no threats require analysis"""
+    return {
+        "executive_summary": "All alerts were filtered during validation. No actionable threats detected.",
+        "threat_statistics": {
+            "total_threats": 0,
+            "unique_attackers": 0,
+            "attack_categories": [],
+            "severity_breakdown": {},
+            "clusters_analyzed": 0
+        },
+        "key_findings": [
+            "All alerts classified as false positives or benign",
+            "No immediate threat response required"
+        ],
+        "threat_actors": [],
+        "iocs": {
+            "malicious_ips": [],
+            "signature_ids": [],
+            "attack_patterns": []
+        },
+        "immediate_actions": [
+            "No immediate actions required",
+            "Continue monitoring"
+        ],
+        "strategic_recommendations": [
+            "Review validation rules if false positive rate seems high",
+            "Maintain current security posture"
+        ],
+        "risk_assessment": {
+            "overall_risk": "LOW",
+            "confidence": 0.95,
+            "reasoning": "Validation layer successfully filtered all non-threatening alerts"
         }
     }
