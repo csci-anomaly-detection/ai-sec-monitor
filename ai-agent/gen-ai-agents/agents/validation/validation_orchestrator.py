@@ -197,7 +197,7 @@ class ValidationOrchestrator:
             "ip": src_ip,
             "severity": severity_str,
             "severity_level": severity,
-            "confidence_score": 0.5,  # Default ML confidence
+            "confidence_score": 0.5,  
             "attack_type": signature,
             "total_events": 1,
             "rules_violated": [{

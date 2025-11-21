@@ -125,27 +125,29 @@ The validation layer acts as a smart filter, examining anomalies flagged by ML a
 ┌─────────────────────────────────────────────────────────────────────┐
 │          ANOMALY VALIDATION LAYER (1B - Multi-Agent)               │
 │                                                                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
-│  │   Feature    │  │   Context    │  │    Attack    │            │
-│  │   Analyzer   │  │    Agent     │  │   Pattern    │            │
-│  │   Agent      │  │              │  │    Agent     │            │
-│  │              │  │              │  │              │            │
-│  │ • Stats      │  │ • Time of    │  │ • Match      │            │
-│  │   analysis   │  │   day check  │  │   attack     │            │
-│  │ • Z-scores   │  │ • IP history │  │   signatures │            │
-│  │ • Outliers   │  │ • Known      │  │ • Behavioral │            │
-│  │              │  │   patterns   │  │   anomalies  │            │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘            │
-│         │                 │                 │                      │
-│         └─────────┬────────┴────────┬────────┘                      │
-│                   │                │                                │
-│            ┌──────▼─────────────────▼────┐                          │
-│            │    Consensus Agent         │                          │
-│            │  (weighs all opinions)    │                          │
-│            │  • 2-of-3 majority        │                          │
-│            │  • Confidence weighting   │                          │
-│            │  • Conflict resolution     │                          │
-│            └────────────┬───────────────┘                          │
+│  ┌──────────────┐              ┌──────────────┐                    │
+│  │   Feature    │              │   Context    │                    │
+│  │   Analyzer   │              │    Agent     │                    │
+│  │   Agent      │              │              │                    │
+│  │              │              │              │                    │
+│  │ • Stats      │              │ • Time of    │                    │
+│  │   analysis   │              │   day check  │                    │
+│  │ • Z-scores   │              │ • IP history │                    │
+│  │ • Outliers   │              │ • Known      │                    │
+│  │              │              │   patterns   │                    │
+│  │              │              │ • Network    │                    │
+│  │              │              │   context    │                    │
+│  └──────┬───────┘              └──────┬───────┘                    │
+│         │                             │                            │
+│         └─────────┬───────────────────┘                            │
+│                   │                                                │
+│            ┌──────▼────────────────────┐                          │
+│            │    Consensus Agent          │                          │
+│            │  (weighs all opinions)      │                          │
+│            │  • Agreement resolution      │                          │
+│            │  • Confidence weighting     │                          │
+│            │  • Conflict resolution      │                          │
+│            └────────────┬─────────────── ┘                          │
 │                         ▼                                            │
 │              Classification Decision                                │
 │   ├─ REAL_THREAT    (→ Full analysis pipeline)                      │
@@ -166,11 +168,13 @@ The validation layer acts as a smart filter, examining anomalies flagged by ML a
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+**Note on Attack Pattern Analysis:** The Batching Agent (in the main analysis pipeline) already performs comprehensive attack pattern matching, signature analysis, and MITRE ATT&CK mapping using ChromaDB. Therefore, a separate Attack Pattern Agent in the validation layer would be redundant. The validation layer focuses on statistical and contextual analysis to distinguish real threats from false positives.
+
 **Characteristics:**
-- Multiple LLM calls per anomaly (~800-2000ms latency)
-- Three specialized agents analyze from different perspectives
+- Multiple LLM calls per anomaly (~400-1000ms latency)
+- Two specialized agents analyze from different perspectives (statistical vs contextual)
 - Consensus agent combines opinions with weighted voting
-- Higher accuracy but more expensive and complex
+- Higher accuracy than single agent, with moderate cost increase
 
 ## Design Considerations
 
@@ -198,13 +202,15 @@ The validation layer acts as a smart filter, examining anomalies flagged by ML a
   - Higher accuracy through multiple perspectives
   - More explainable (shows reasoning from each agent)
   - Better handling of complex edge cases
-  - Can use specialized agents for different attack types
+  - Specialized agents provide complementary analysis (statistical vs contextual)
+  - Two-agent system balances accuracy and cost
 - **Cons:**
-  - Higher latency (800-2000ms per anomaly)
-  - More complex implementation (4+ agents, coordination logic)
-  - Higher cost (4+ LLM calls per anomaly)
+  - Higher latency (400-1000ms per anomaly)
+  - More complex implementation (3 agents including consensus, coordination logic)
+  - Higher cost (2 LLM calls per anomaly + consensus processing)
   - Potential for agent disagreement requiring consensus logic
   - Best for lower-volume, high-stakes scenarios
+- **Design Note:** Attack pattern matching is intentionally excluded from multi-agent validation since the Batching Agent already performs comprehensive pattern analysis (signature matching, MITRE ATT&CK mapping, behavioral analysis) in the main analysis pipeline. The validation layer focuses on distinguishing real threats from false positives using statistical and contextual analysis.
 
 **Recommendation:** **Implement Option 1A (Single Agent) initially**, with architecture designed to support upgrade to Option 1B if needed. This provides immediate value with manageable complexity. Option 1B can be added later if analysis shows single agent validation has >20% false positive rate remaining after implementation.
 
@@ -511,12 +517,12 @@ GROUP BY validation_classification;
 - Latency: ~200-500ms per anomaly
 
 **MultiAgentValidator** - Future enhancement (Approach 1B):
-- Three specialized agents analyze anomaly in parallel:
-  - Feature Analyzer Agent: Statistical analysis
-  - Context Agent: Historical patterns, time-of-day, known IPs
-  - Attack Pattern Agent: Signature matching, behavioral analysis
-- Consensus Agent combines agent opinions with weighted voting
-- Latency: ~800-2000ms per anomaly (higher cost, higher accuracy)
+- Two specialized agents analyze anomaly in parallel:
+  - **Feature Analyzer Agent**: Statistical analysis, z-scores, outliers, feature deviations, pattern recognition
+  - **Context Agent**: Historical patterns, time-of-day, known IPs, network context, maintenance windows, temporal correlation
+- Consensus Agent combines agent opinions with weighted voting and conflict resolution
+- Latency: ~400-1000ms per anomaly (moderate cost increase, higher accuracy)
+- **Note:** Attack pattern matching is handled by the Batching Agent in the main analysis pipeline, so it's not duplicated here. The validation layer focuses on statistical and contextual analysis to filter false positives.
 
 ## Risks & Mitigations
 
@@ -580,6 +586,8 @@ GROUP BY validation_classification;
 4. **How should we handle analyst feedback?** Phase 1: Just store feedback, Phase 2: Train secondary model on feedback data.
 
 5. **Should multi-agent system be implemented in Phase 1 or later?** Recommendation: Later, but architecture supports it.
+
+6. **Why no Attack Pattern Agent in multi-agent validation?** The Batching Agent already performs comprehensive attack pattern matching (signature lookup, MITRE ATT&CK mapping, behavioral analysis) using ChromaDB. Adding it to validation would be redundant. The validation layer uses two complementary agents (Feature Analyzer for statistical analysis, Context Agent for historical/contextual analysis) to distinguish real threats from false positives.
 
 ## References
 - Existing Isolation Forest implementation: `detect/anomaly.py`
