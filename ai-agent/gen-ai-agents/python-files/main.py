@@ -45,7 +45,6 @@ for handler in logger.handlers:
     handler.setFormatter(StageFormatter())
 
 # Import pipeline stages
-from pre_batch import process_and_store_batches
 from analyst_agent import analyze_all_threats_batch
 from validation_orchestrator import ValidationOrchestrator
 
@@ -148,52 +147,17 @@ def stage_0_validation(raw_log_location: str) -> tuple:
         return None, {"error": str(e)}
 
 def process_validated_threats(validated_data: dict) -> list:
-    """Convert validated threat data to batched format"""
+    """Return validated results directly (no conversion needed)"""
     try:
-        batched_threats = []
-        if 'detailed_results' not in validated_data:
-            logger.warning("⚠️  No 'detailed_results' found in validated data")
-            return []
-
-        for result in validated_data['detailed_results']:
-            alert = result.get("alert", {})
-            flow = result.get("flow", {})
-            analysis = result.get("analysis", {})
-            llm_validation = result.get("llm_validation", {})
-
-            ip = result.get("src_ip") or result.get("dest_ip") or flow.get("src_ip") or flow.get("dest_ip") or "unknown"
-
-            signature_ids = []
-            if alert.get("signature_id"):
-                signature_ids.append(alert["signature_id"])
-            if result.get("rules_violated"):
-                for rule in result["rules_violated"]:
-                    sid = rule.get("sid") or rule.get("signature_id")
-                    if sid:
-                        signature_ids.append(sid)
-            signature_ids = list({str(sid) for sid in signature_ids if sid})
-
-            batched_threat = {
-                "ip": ip,
-                "severity": alert.get("severity", 0),
-                "attack_type": alert.get("signature") or result.get("attack_type") or "unknown",
-                "classification": analysis.get("classification", ""),
-                "llm_decision": llm_validation.get("decision", ""),
-                "src_ips": [result.get("src_ip")] if result.get("src_ip") else [],
-                "dest_ips": [result.get("dest_ip")] if result.get("dest_ip") else [],
-                "ports": list(filter(None, [result.get("src_port"), result.get("dest_port")])),
-                "signature_ids": signature_ids,
-                "alerts": [alert] if alert else [],
-            }
-            batched_threats.append(batched_threat)
-
+        detailed_results = validated_data.get('detailed_results', [])
+        
         logs = [
-            f"✅ Converted {len(batched_threats)} alerts into batch format",
-            f"   • Ready for analysis"
+            f"✅ Loaded {len(detailed_results)} validated results",
+            f"   • Ready for hierarchical analysis"
         ]
         print_stage_box(logs, Colors.YELLOW)
         
-        return batched_threats
+        return detailed_results  # Return validation results as-is
 
     except Exception as e:
         logger.error(f"❌ Error processing validated threats: {e}", exc_info=True)
