@@ -31,6 +31,12 @@ class StageFormatter(logging.Formatter):
         return record.getMessage()
 
 # Configure logging
+class HttpxFilter(logging.Filter):
+    def filter(self, record):
+        # Exclude all httpx, chromadb, and telemetry logs
+        excluded = ["httpx", "chromadb", "telemetry", "posthog"]
+        return not any(exc in record.name for exc in excluded)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(message)s',
@@ -49,7 +55,7 @@ from analyst_agent import analyze_all_threats_batch
 from validation_orchestrator import ValidationOrchestrator
 
 # Configuration
-RAW_LOG_LOCATION = os.getenv("RAW_LOG_LOCATION", "/app/logs/eve.json")
+RAW_LOG_LOCATION = os.getenv("RAW_LOG_LOCATION", "/app/logs/demo.json")
 VALIDATED_LOG_LOCATION = os.getenv("VALIDATED_LOG_LOCATION", "/app/logs/validated_threats.json")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "/app/output")
 ENABLE_EMAIL = os.getenv("ENABLE_EMAIL", "false").lower() == "true"
@@ -82,8 +88,11 @@ def load_validated_data(validated_log_location: str) -> tuple:
         with open(validated_file_path, 'r') as f:
             validated_data = json.load(f)
         
-        validation_stats = validated_data.get("summary", {})
-        detailed_results = validated_data.get("detailed_results", [])
+        validated_alerts, validation_stats = stage_0_validation(RAW_LOG_LOCATION)
+        validated_data = {
+            "summary": validation_stats,
+            "detailed_results": validated_alerts
+        }
         
         logs = [
             f"✅ Loaded {len(detailed_results)} validated alerts",
@@ -103,53 +112,127 @@ def load_validated_data(validated_log_location: str) -> tuple:
         return {}, {}
 
 def stage_0_validation(raw_log_location: str) -> tuple:
-    """Stage 0: Run validation agent on raw logs"""
+    """Stage 0: Validate raw alerts before pipeline processing."""
+    
     try:
-        if not os.path.exists(raw_log_location):
-            logger.error(f"❌ Raw log file not found: {raw_log_location}")
-            return [], {}
+        # Load raw data
+        with open(raw_log_location, 'r') as f:
+            raw_data = json.load(f)
         
-        logger.info(f"🔍 Running validation on: {raw_log_location}")
-        
+        # Initialize validator
         validator = ValidationOrchestrator()
-        logger.info("✅ Validation orchestrator initialized")
         
-        validated_alerts, validation_stats = validator.validate_eve_json(raw_log_location)
+        print_stage_box([f"🔍 Running validation on: {raw_log_location}"], Colors.CYAN)
+        print_stage_box([f"✅ Validation orchestrator initialized"], Colors.GREEN)
         
-        if not validated_alerts:
-            logger.warning("⚠️  Validation produced no results")
-            return [], {}
+        # ✅ EXTRACT ALL THREATS (Correlated + Individual)
+        alerts_data = raw_data.get("alerts", {})
+        all_threats = []
         
-        logs = [
-            f"✅ Validation complete: {len(validated_alerts)} alerts validated",
-            f"   • Total: {validation_stats.get('total_alerts', 0)}",
-            f"   • Errors: {validation_stats.get('errors', 0)}"
-        ]
-        print_stage_box(logs, Colors.CYAN)
+        # 1. Get Correlated Threats (already have proper structure)
+        correlated = alerts_data.get("correlated_threats", [])
+        if isinstance(correlated, list):
+            all_threats.extend(correlated)
         
-        validated_data = {
-            "summary": validation_stats,
+        # 2. Get Individual Alerts (need to extract IP from matches)
+        individual = alerts_data.get("individual_alerts", [])
+        if isinstance(individual, list):
+            for alert in individual:
+                if isinstance(alert, dict):
+                    # ✅ Extract IP from matches array
+                    matches = alert.get("matches", [])
+                    if matches and len(matches) > 0:
+                        first_match = matches[0]
+                        ip = first_match.get("src_ip", "unknown")
+                        
+                        # Build threat object from individual alert
+                        threat_obj = {
+                            "ip": ip,
+                            "attack_type": alert.get("rule_id", "unknown").replace("_", " ").title(),
+                            "severity": alert.get("severity", "LOW").upper(),
+                            "total_events": alert.get("count", len(matches)),
+                            "description": alert.get("description", ""),
+                            "rules_violated": [alert],
+                            "confidence_score": 0.5,
+                            "timestamps": [m.get("@timestamp", "") for m in matches[:10]]
+                        }
+                        all_threats.append(threat_obj)
+
+        if not all_threats:
+            print_stage_box([f"⚠️  No threats found in {raw_log_location}"], Colors.YELLOW)
+            return [], {"total_threats": 0, "validated": 0, "errors": 0}
+        
+        print_stage_box([
+            f"📊 Found {len(all_threats)} total threats to validate",
+            f"   • Correlated: {len(correlated)}",
+            f"   • Individual: {len(individual)}"
+        ], Colors.CYAN)
+        
+        validated_alerts = []
+        errors = 0
+        
+        # ✅ VALIDATE EACH THREAT
+        for idx, threat in enumerate(all_threats, 1):
+            # Ensure threat is a dictionary
+            if not isinstance(threat, dict):
+                errors += 1
+                logger.warning(f"Skipping invalid threat #{idx}: {type(threat)}")
+                continue
+            
+            try:
+                # Call validate_threat on the instance
+                result = validator.validate_threat(threat)
+                validated_alerts.append(result)
+                
+                ip = threat.get("ip", "unknown")
+                classification = result.get("classification", "UNKNOWN")
+                logger.info(f"✅ Threat #{idx} validated: {ip} -> {classification}")
+                
+            except Exception as e:
+                errors += 1
+                ip = threat.get("ip", "unknown")
+                logger.error(f"Error validating threat #{idx} ({ip}): {e}")
+        
+        # Build stats
+        stats = {
+            "total_threats": len(all_threats),
+            "validated": len(validated_alerts),
+            "errors": errors,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # ✅ SAVE VALIDATED RESULTS TO FILE
+        validated_output = {
+            "summary": stats,
             "detailed_results": validated_alerts
         }
         
-        try:
-            validated_file_path = Path(VALIDATED_LOG_LOCATION)
-            validated_file_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(validated_file_path, 'w') as f:
-                json.dump(validated_data, f, indent=2, default=str)
-                logger.info(f"💾 Validated alerts saved to: {validated_file_path}")
-        except Exception as e:
-            logger.warning(f"⚠️  Could not save validated data: {e}")
-        return validated_data, validation_stats
-    
+        output_path = Path(VALIDATED_LOG_LOCATION)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_path, 'w') as f:
+            json.dump(validated_output, f, indent=2, default=str)
+        
+        logger.info(f"💾 Validated threats saved to: {output_path}")
+        
+        print_stage_box([
+            f"✅ Validation complete",
+            f"   • Total: {len(all_threats)}",
+            f"   • Validated: {len(validated_alerts)}",
+            f"   • Errors: {errors}",
+            f"   • Saved to: {output_path}"
+        ], Colors.GREEN)
+        
+        return validated_alerts, stats
+        
     except Exception as e:
         logger.error(f"❌ Error in Stage 0 (Validation): {e}", exc_info=True)
-        return None, {"error": str(e)}
+        return [], {"error": str(e)}
 
 def process_validated_threats(validated_data: dict) -> list:
-    """Return validated results directly (no conversion needed)"""
+    """Return validated results directly"""
     try:
-        detailed_results = validated_data.get('detailed_results', [])
+        detailed_results = validated_data.get("detailed_results", [])
         
         logs = [
             f"✅ Loaded {len(detailed_results)} validated results",
@@ -157,7 +240,7 @@ def process_validated_threats(validated_data: dict) -> list:
         ]
         print_stage_box(logs, Colors.YELLOW)
         
-        return detailed_results  # Return validation results as-is
+        return detailed_results
 
     except Exception as e:
         logger.error(f"❌ Error processing validated threats: {e}", exc_info=True)
@@ -278,35 +361,40 @@ def run_full_pipeline():
     try:
         ensure_directories()
 
-        # STAGE 0
+        # STAGE 0: VALIDATION
         print_stage_header(0, "DATA LOADING", Colors.CYAN)
         
-        if ENABLE_VALIDATION:
-            validated_data, validation_stats = stage_0_validation(RAW_LOG_LOCATION)
-        else:
-            validated_data, validation_stats = load_validated_data(VALIDATED_LOG_LOCATION)
+        validated_alerts, validation_stats = stage_0_validation(RAW_LOG_LOCATION)
+        validated_data = {
+            "summary": validation_stats,
+            "detailed_results": validated_alerts
+        }
 
-        if not validated_data or not validated_data.get("detailed_results"):
+        if not validated_data.get("detailed_results"):
             logger.error("❌ No validated data available to process")
             return {"error": "No validated data", "status": "failed"}
 
-        # STAGE 1
+        # STAGE 1: BATCHING
         print_stage_header(1, "BATCHING", Colors.YELLOW)
         batched_data = process_validated_threats(validated_data)
         
-        # STAGE 2
+        if not batched_data:
+            logger.error("❌ No batched data available")
+            return {"error": "No batched data", "status": "failed"}
+        
+        # STAGE 2: ANALYST REVIEW
         print_stage_header(2, "ANALYST REVIEW", Colors.BLUE)
         analyst_report = stage_3_analyst_review(batched_data)
 
-        # STAGE 3
+        # STAGE 3: SAVE RESULTS
         print_stage_header(3, "RESULTS", Colors.GREEN)
         output_file = save_results(analyst_report)
 
         final_output = {
             "status": "success",
             "pipeline_stages": {
-                "validation_stats": validation_stats,
-                "batched_threats": len(batched_data),
+                "validation": validation_stats,
+                "threats_analyzed": len(batched_data),
             },
             "output_file": output_file,
             "results": analyst_report,
@@ -325,7 +413,7 @@ def run_full_pipeline():
         print(f"\n{Colors.BOLD}{Colors.RED}{'█' * 80}{Colors.ENDC}")
         print(f"{Colors.BOLD}{Colors.RED}█ PIPELINE FAILED{' ' * (61)}{Colors.ENDC}{Colors.RED}█{Colors.ENDC}{Colors.BOLD}")
         print(f"{Colors.RED}{'█' * 80}{Colors.ENDC}\n")
-        logger.error(f"❌ Error: {e}", exc_info=True)
+        logger.error(f"❌ Pipeline Error: {e}", exc_info=True)
         return {"error": str(e), "status": "failed"}
 
 if __name__ == "__main__":

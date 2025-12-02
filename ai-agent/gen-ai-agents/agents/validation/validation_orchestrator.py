@@ -1,703 +1,848 @@
-"""
-Validation Orchestrator - Integrates validation layer with the analysis pipeline.
-
-This module coordinates the FeatureAnalyzer and LLMValidator to pre-filter
-security alerts before they enter the batching and analysis stages.
-"""
-
-import json
+import os
+import time
 import logging
-import sys
-from typing import List, Dict, Any, Tuple
-from pathlib import Path
+import json
+from typing import Dict, Any, Optional, Tuple
 from datetime import datetime
-
+from pathlib import Path
+import ollama
+import re
 from feature_analyzer import FeatureAnalyzer
-from llm_validator import LLMValidator
+from context_agent import ContextAgent
 
-# ============================================================================
-# ANSI Color codes
-# ============================================================================
-class Colors:
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
-# ============================================================================
-# SETUP LOGGING
-# ============================================================================
-class StageFormatter(logging.Formatter):
-    """Custom formatter - no level prefix, just message"""
-    def format(self, record):
-        return record.getMessage()
-
-log_file = Path(__file__).parent.parent.parent / "logs" / "validated_threats.log"
-log_file.parent.mkdir(parents=True, exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(message)s',
-    handlers=[
-        logging.FileHandler(log_file),
-        logging.StreamHandler()
-    ]
-)
-
-logger = logging.getLogger(__name__)
-for handler in logger.handlers:
-    handler.setFormatter(StageFormatter())
-
-# ============================================================================
-# LOGGING UTILITIES
-# ============================================================================
-def print_validation_header(title):
-    """Print validation section header"""
-    print(f"\n{Colors.BOLD}{Colors.CYAN}{'═' * 80}{Colors.ENDC}")
-    print(f"{Colors.BOLD}{Colors.CYAN}  {title}{' ' * (74 - len(title))}{Colors.ENDC}{Colors.CYAN}  ║{Colors.ENDC}{Colors.BOLD}")
-    print(f"{Colors.CYAN}{'═' * 80}{Colors.ENDC}\n")
-
-def print_info_box(content_lines, color=Colors.BLUE):
-    """Print info in a colored box"""
-    print(f"{color}┌{'─' * 78}┐{Colors.ENDC}")
-    for line in content_lines:
-        line = str(line)[:76]
-        print(f"{color}│{Colors.ENDC} {line:<76} {color}│{Colors.ENDC}")
-    print(f"{color}└{'─' * 78}┘{Colors.ENDC}\n")
-
-def print_stats_box(stats_dict, color=Colors.GREEN):
-    """Print statistics in a formatted box"""
-    print(f"{color}╔{'═' * 78}╗{Colors.ENDC}")
-    print(f"{color}║{Colors.ENDC} {Colors.BOLD}VALIDATION STATISTICS{Colors.ENDC}{' ' * 56} {color}║{Colors.ENDC}")
-    print(f"{color}╠{'─' * 78}╣{Colors.ENDC}")
-    
-    for key, value in stats_dict.items():
-        display_key = key.replace('_', ' ').title()
-        line = f"{display_key}: {value}"
-        print(f"{color}║{Colors.ENDC} {line:<76} {color}║{Colors.ENDC}")
-    
-    print(f"{color}╚{'═' * 78}╝{Colors.ENDC}\n")
-
-# ============================================================================
-# DATE TIME ENCODER
-# ============================================================================
-class DateTimeEncoder(json.JSONEncoder):
-    """Custom JSON encoder for datetime objects."""
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return super().default(obj)
-
-# ============================================================================
-# CHROMADB INTEGRATION
-# ============================================================================
-def store_threats_in_chroma(validated_threats: List[Dict], chroma_client=None):
-    """
-    Store validated threats in ChromaDB all_threats collection.
-    
-    Args:
-        validated_threats: List of validated threat results
-        chroma_client: Optional ChromaDB client (will create if None)
-    """
-    try:
-        import chromadb
-        from chromadb.utils import embedding_functions
-        
-        # Initialize ChromaDB client if not provided
-        if chroma_client is None:
-            chroma_host = "chroma"
-            chroma_port = 8000
-            chroma_client = chromadb.HttpClient(host=chroma_host, port=chroma_port)
-        
-        # Get or create collection
-        default_ef = embedding_functions.DefaultEmbeddingFunction()
-        
-        try:
-            collection = chroma_client.get_collection(
-                name="all_threats",
-                embedding_function=default_ef
-            )
-        except:
-            collection = chroma_client.create_collection(
-                name="all_threats",
-                embedding_function=default_ef,
-                metadata={"hnsw:space": "cosine"}
-            )
-        
-        # Prepare documents for storage
-        documents = []
-        metadatas = []
-        ids = []
-        
-        for idx, result in enumerate(validated_threats):
-            threat = result.get("threat", {})
-            analysis = result.get("analysis", {})
-            llm_validation = result.get("llm_validation", {})
-            
-            # Extract key fields
-            ip = threat.get("ip", "unknown")
-            attack_type = threat.get("attack_type", "unknown")
-            severity = threat.get("severity", "LOW")
-            total_events = threat.get("total_events", 0)
-            
-            classification = analysis.get("classification", "UNKNOWN")
-            llm_decision = llm_validation.get("decision", "UNKNOWN")
-            
-            # Create document text for embedding
-            doc_text = f"""
-            IP: {ip}
-            Attack Type: {attack_type}
-            Severity: {severity}
-            Total Events: {total_events}
-            Classification: {classification}
-            LLM Decision: {llm_decision}
-            Heuristic Flags: {', '.join(analysis.get('heuristic_flags', []))}
-            Destination IPs: {', '.join(map(str, threat.get('dest_ips', [])))}
-            Ports Targeted: {', '.join(map(str, threat.get('ports', [])))}
-            Rules Violated: {', '.join([r.get('rule_id', '') for r in threat.get('rules_violated', [])])}
-            """
-            
-            # Create metadata
-            metadata = {
-                "ip": ip,
-                "attack_type": attack_type,
-                "severity": severity,
-                "total_events": total_events,
-                "classification": classification,
-                "llm_decision": llm_decision,
-                "confidence_score": float(threat.get("confidence_score", 0.5)),
-                "timestamp": datetime.now().isoformat(),
-                "source": "validation_orchestrator"
-            }
-            
-            # Create unique ID
-            threat_id = f"threat_{ip}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{idx}"
-            
-            documents.append(doc_text.strip())
-            metadatas.append(metadata)
-            ids.append(threat_id)
-        
-        # Store in ChromaDB (batch upsert)
-        if documents:
-            collection.upsert(
-                documents=documents,
-                metadatas=metadatas,
-                ids=ids
-            )
-            
-            print_info_box([
-                f"✅ Stored {len(documents)} validated threats in ChromaDB",
-                f"   • Collection: all_threats",
-                f"   • Threats can now be queried by analyst agent"
-            ], Colors.GREEN)
-        
-        return len(documents)
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to store threats in ChromaDB: {e}")
-        print_info_box([
-            f"⚠️  Failed to store threats in ChromaDB",
-            f"   Error: {str(e)}",
-            f"   Threats are still saved to JSON file"
-        ], Colors.YELLOW)
-        return 0
-
-# ============================================================================
-# VALIDATION ORCHESTRATOR
-# ============================================================================
 class ValidationOrchestrator:
     """
-    Orchestrates validation of raw security alerts before analysis.
-    
-    Workflow:
-    1. Raw alerts → FeatureAnalyzer (heuristic filtering)
-    2. Ambiguous alerts → LLMValidator (contextual validation)
-    3. Validated alerts → Pipeline (preprocessing & batching)
-    4. Store validated threats → ChromaDB all_threats collection
+    Orchestrates multi-agent threat validation combining heuristic and contextual analysis.
+
+    The ValidationOrchestrator coordinates two specialized agents:
+    1. Feature Analyzer Agent: Fast heuristic-based pre-filtering
+    2. Context Agent: Deep historical pattern analysis with RAG
+
+    It uses weighted voting and conflict resolution to produce unified classifications.
     """
-    
+
+    # Classification constants
+    REAL_THREAT = "REAL_THREAT"
+    SUSPICIOUS = "SUSPICIOUS"
+    FALSE_POSITIVE = "FALSE_POSITIVE"
+    BENIGN_ANOMALY = "BENIGN_ANOMALY"
+
+    # Recommendation constants
+    FILTER = "filter"
+    REVIEW = "review"
+    ESCALATE = "escalate"
+
     def __init__(
         self,
-        enable_llm_validation: bool = True,
-        ollama_model: str = "llama3.1:8b",
-        ollama_url: str = None,
-        enable_logging: bool = False,
-        chroma_client=None
+        feature_analyzer: Optional[FeatureAnalyzer] = None,
+        context_agent: Optional[ContextAgent] = None,
+        confidence_weights: Optional[Dict[str, float]] = None,
+        fast_path_threshold: float = 0.8,
+        use_llm_consensus: bool = True,
+        consensus_model: str = "llama3.1:8b",
+        enable_logging: bool = True
     ):
         """
-        Initialize ValidationOrchestrator.
-        
+        Initialize ValidationOrchestrator with agent instances.
+
         Args:
-            enable_llm_validation: Whether to use LLM for ambiguous cases
-            ollama_model: Ollama model name for LLM validation
-            ollama_url: Ollama API endpoint (default: http://ollama:11434)
-            enable_logging: Whether to enable verbose logging
-            chroma_client: Optional ChromaDB client for storing threats
+            feature_analyzer: FeatureAnalyzer instance (creates default if None)
+            context_agent: ContextAgent instance (creates default if None)
+            confidence_weights: Custom confidence weights for each component (used for rule-based fallback)
+                Default: {"ml_model": 0.2, "feature_analyzer": 0.3, "context_agent": 0.5}
+            fast_path_threshold: Confidence threshold for fast-path optimization (default: 0.8)
+            use_llm_consensus: Whether to use LLM for consensus decision (default: True)
+            consensus_model: Ollama model for LLM consensus (default: "llama3.1:8b")
+            enable_logging: Enable detailed logging (default: True)
         """
-        self.enable_llm_validation = enable_llm_validation
+        # Initialize agents
+        self.feature_analyzer = feature_analyzer or FeatureAnalyzer(enable_logging=enable_logging)
+        self.context_agent = context_agent or ContextAgent(enable_logging=enable_logging)
+
+        # Set confidence weights (used for rule-based fallback when LLM unavailable)
+        self.confidence_weights = confidence_weights or {
+            "ml_model": 0.2,
+            "feature_analyzer": 0.3,
+            "context_agent": 0.5
+        }
+
+        # Validate weights sum to 1.0
+        weight_sum = sum(self.confidence_weights.values())
+        if abs(weight_sum - 1.0) > 0.01:
+            raise ValueError(f"Confidence weights must sum to 1.0 (got {weight_sum})")
+
+        self.fast_path_threshold = fast_path_threshold
+        self.use_llm_consensus = use_llm_consensus
+        self.consensus_model = consensus_model or os.getenv("OLLAMA_MODEL", "llama3.1:8b")
         self.enable_logging = enable_logging
-        self.chroma_client = chroma_client
-        
-        # Initialize FeatureAnalyzer
-        self.feature_analyzer = FeatureAnalyzer(enable_logging=False)
-        
-        # Initialize LLMValidator if enabled
-        if enable_llm_validation:
-            try:
-                self.llm_validator = LLMValidator(
-                    model=ollama_model,
-                    base_url=ollama_url,
-                    enable_logging=False,
-                    timeout_seconds=10.0
-                )
-            except Exception as e:
-                logger.warning(f"⚠️  Failed to initialize LLM Validator: {e}")
-                self.llm_validator = None
-                self.enable_llm_validation = False
-        else:
-            self.llm_validator = None
-    
-    def validate_eve_json(self, eve_json_path: str) -> Tuple[List[Dict], Dict[str, int]]:
+
+        # Load consensus prompt template
+        self.consensus_prompt_template = self._load_consensus_prompt()
+
+        if enable_logging:
+            logging.basicConfig(
+                level=logging.INFO,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            logging.info(
+                f"ValidationOrchestrator initialized with agents "
+                f"(LLM consensus: {use_llm_consensus}, model: {self.consensus_model})"
+            )
+
+    def validate_threat(self, threat_data: Dict) -> Dict[str, Any]:
         """
-        Validate raw Suricata eve.json alerts before pipeline processing.
+        Main validation orchestration method.
         
         Args:
-            eve_json_path: Path to eve.json file with Suricata alerts
+            threat_data (Dict): Threat data (must be a dictionary)
         
         Returns:
-            Tuple of (validated_alerts, stats):
-            - validated_alerts: List of enriched alerts with validation results
-            - stats: Dict with validation statistics
+            Dict: Unified validation result WITH threat_data preserved
         """
-        print_validation_header("🔍 AGGREGATION & FEATURE ANALYSIS PHASE")
-        
-        # Read raw eve.json
+        start_time = time.time()
+
+        # ✅ ADD TYPE CHECK HERE
+        if not isinstance(threat_data, dict):
+            logging.error(f"Invalid threat_data type: {type(threat_data)}. Expected dict, got: {threat_data}")
+            latency_ms = int((time.time() - start_time) * 1000)
+            return {
+                "classification": self.SUSPICIOUS,
+                "confidence": 0.0,
+                "recommendation": self.REVIEW,
+                "reasoning": f"Invalid threat data type: {type(threat_data).__name__}. Expected dictionary.",
+                "agent_opinions": {},
+                "confidence_breakdown": {
+                    "ml_confidence": 0.0,
+                    "feature_analyzer_confidence": 0.0,
+                    "context_agent_confidence": 0.0,
+                    "combined_confidence": 0.0
+                },
+                "decision_path": "type_error",
+                "latency_ms": latency_ms
+            }
+
         try:
-            with open(eve_json_path, 'r') as f:
-                raw_alerts = [json.loads(line) for line in f if line.strip()]
+            if self.enable_logging:
+                logging.info(f"Starting validation for IP: {threat_data.get('ip', 'unknown')}")
+
+            # Step 1: Run Feature Analyzer (Fast heuristic pre-filter)
+            if self.enable_logging:
+                logging.info("Running Feature Analyzer (heuristic pre-filter)")
+
+            fa_result = self._run_feature_analyzer(threat_data)
+            fa_classification = fa_result.get("classification")
+            fa_confidence = fa_result.get("feature_analyzer_confidence_score", 0.5)
+
+            # Step 2: Fast-path optimization for high-confidence Feature Analyzer decisions
+            if fa_classification == "FALSE_POSITIVE" and fa_confidence >= self.fast_path_threshold:
+                # High confidence false positive - skip Context Agent
+                if self.enable_logging:
+                    logging.info(f"Fast-path: FALSE_POSITIVE (confidence: {fa_confidence:.2f})")
+
+                latency_ms = int((time.time() - start_time) * 1000)
+                return self._build_fast_path_result(
+                    threat_data, fa_result, self.FALSE_POSITIVE, latency_ms
+                )
+
+            elif fa_classification == "POSSIBLE_THREAT" and fa_confidence >= self.fast_path_threshold:
+                # High confidence threat - map to SUSPICIOUS for review
+                if self.enable_logging:
+                    logging.info(f"Fast-path: SUSPICIOUS (confidence: {fa_confidence:.2f})")
+
+                latency_ms = int((time.time() - start_time) * 1000)
+                return self._build_fast_path_result(
+                    threat_data, fa_result, self.SUSPICIOUS, latency_ms
+                )
+
+            # Step 3: Run Context Agent for ambiguous cases
+            if self.enable_logging:
+                logging.info("Running Context Agent (historical RAG analysis)")
+
+            context_result = self._run_context_agent(threat_data)
+
+            # Step 4: Aggregate decisions from both agents
+            if self.enable_logging:
+                logging.info("Aggregating decisions from both agents")
+
+            unified_result = self._aggregate_decisions(
+                threat_data,
+                fa_result,
+                context_result
+            )
+
+            # Add latency
+            latency_ms = int((time.time() - start_time) * 1000)
+            unified_result["latency_ms"] = latency_ms
+            
+            # ✅ PRESERVE ORIGINAL THREAT DATA
+            unified_result["threat_data"] = {
+                "ip": threat_data.get("ip", "unknown"),
+                "attack_type": threat_data.get("attack_type", "unknown"),
+                "severity": threat_data.get("severity", "unknown"),
+                "total_events": threat_data.get("total_events", 0),
+                "description": threat_data.get("description", ""),
+                "timestamp": threat_data.get("timestamp", "unknown"),
+                "confidence_score": threat_data.get("confidence_score", 0.0),
+                "rules_violated": threat_data.get("rules_violated", []),
+                "src_ips": threat_data.get("src_ips", [threat_data.get("ip", "unknown")]),
+                "dest_ips": threat_data.get("dest_ips", []),
+                "ports": threat_data.get("ports", [])
+            }
+
+            if self.enable_logging:
+                logging.info(
+                    f"Validation complete: {unified_result['classification']} "
+                    f"(confidence: {unified_result['confidence']:.2f}, latency: {latency_ms}ms)"
+                )
+
+            return unified_result
+
         except Exception as e:
-            print_info_box([f"❌ Failed to read {eve_json_path}: {e}"], Colors.RED)
-            return [], {"error": 1}
-        
-        print_info_box([f"📊 Processing {len(raw_alerts)} raw alerts"], Colors.CYAN)
-        
-        # ========================================================================
-        # STEP 1: AGGREGATE ALERTS BY SOURCE IP (like api_response.json does)
-        # ========================================================================
-        aggregated_threats = self._aggregate_alerts_by_ip(raw_alerts)
-        
-        print_info_box([
-            f"✅ Aggregated into {len(aggregated_threats)} unique threat sources",
-            f"   • From {len(raw_alerts)} individual alerts"
-        ], Colors.GREEN)
-        
-        # Statistics
-        stats = {
-            "total_alerts": len(raw_alerts),
-            "validated": 0,
-            "filtered_false_positive": 0,
-            "filtered_benign": 0,
-            "llm_validated": 0,
-            "heuristic_validated": 0,
-            "errors": 0,
-            "stored_in_chromadb": 0
-        }
-        
-        # Track classifications
-        fa_classifications = {}
-        llm_decisions = {}
-        results = []
-        
-        # ========================================================================
-        # STEP 2: RUN FEATURE ANALYZER ON AGGREGATED THREATS
-        # ========================================================================
-        for idx, threat in enumerate(aggregated_threats, 1):
+            logging.error(f"Error during validation: {str(e)}")
+            latency_ms = int((time.time() - start_time) * 1000)
+
+            # Return conservative fallback with threat_data
+            return {
+                "classification": self.SUSPICIOUS,
+                "confidence": 0.0,
+                "recommendation": self.REVIEW,
+                "reasoning": f"Validation error: {str(e)}",
+                "agent_opinions": {},
+                "confidence_breakdown": {
+                    "ml_confidence": threat_data.get("confidence_score", 0.0),
+                    "feature_analyzer_confidence": 0.0,
+                    "context_agent_confidence": 0.0,
+                    "combined_confidence": 0.0
+                },
+                "decision_path": "error_fallback",
+                "latency_ms": latency_ms,
+                "threat_data": {  # ✅ ADD THREAT DATA EVEN ON ERROR
+                    "ip": threat_data.get("ip", "unknown"),
+                    "attack_type": threat_data.get("attack_type", "unknown"),
+                    "severity": threat_data.get("severity", "unknown"),
+                    "total_events": threat_data.get("total_events", 0),
+                    "description": threat_data.get("description", ""),
+                    "timestamp": threat_data.get("timestamp", "unknown"),
+                    "confidence_score": threat_data.get("confidence_score", 0.0),
+                    "rules_violated": threat_data.get("rules_violated", []),
+                    "src_ips": threat_data.get("src_ips", [threat_data.get("ip", "unknown")]),
+                    "dest_ips": threat_data.get("dest_ips", []),
+                    "ports": threat_data.get("ports", [])
+                }
+            }
+
+    def _run_feature_analyzer(self, threat_data: Dict) -> Dict:
+        """Run Feature Analyzer and handle errors gracefully."""
+        try:
+            return self.feature_analyzer.analyze_threat(threat_data)
+        except Exception as e:
+            logging.error(f"Feature Analyzer error: {str(e)}")
+            # Return neutral result
+            return {
+                "classification": "NEEDS_LLM_REVIEW",
+                "ml_confidence_score": threat_data.get("confidence_score", 0.5),
+                "feature_analyzer_confidence_score": 0.0,
+                "reasoning": f"Feature Analyzer error: {str(e)}",
+                "heuristic_flags": [],
+                "analysis_results": {}
+            }
+
+    def _run_context_agent(self, threat_data: Dict) -> Dict:
+        """Run Context Agent and handle errors gracefully."""
+        try:
+            # Map threat_data to Context Agent expected format
+            context_threat_data = {
+                "ip": threat_data.get("ip"),
+                "attack_type": threat_data.get("attack_type"),
+                "severity": threat_data.get("severity", "unknown").lower(),
+                "description": threat_data.get("description", ""),
+                "timestamp": threat_data.get("timestamp", datetime.now().isoformat())
+            }
+
+            return self.context_agent.analyze_context(context_threat_data)
+
+        except Exception as e:
+            logging.error(f"Context Agent error: {str(e)}")
+            # Return neutral result
+            return {
+                "classification": self.SUSPICIOUS,
+                "confidence": 0.0,
+                "reasoning": f"Context Agent error: {str(e)}",
+                "recommendation": self.REVIEW,
+                "key_evidence": [],
+                "context_summary": {}
+            }
+
+    def _aggregate_decisions(
+        self,
+        threat_data: Dict,
+        fa_result: Dict,
+        context_result: Dict
+    ) -> Dict[str, Any]:
+        """
+        Aggregate decisions from both agents using LLM-based consensus or rule-based fallback.
+
+        Args:
+            threat_data: Original threat data
+            fa_result: Feature Analyzer result
+            context_result: Context Agent result
+
+        Returns:
+            Unified validation result with aggregated decision
+        """
+        # Extract confidences
+        ml_confidence = threat_data.get("confidence_score", 0.5)
+        fa_confidence = fa_result.get("feature_analyzer_confidence_score", 0.5)
+        context_confidence = context_result.get("confidence", 0.5)
+
+        # Map Feature Analyzer classification to unified scheme
+        fa_unified_class = self._map_fa_classification(fa_result.get("classification"))
+
+        # Context Agent already uses unified scheme
+        context_class = context_result.get("classification", self.SUSPICIOUS)
+
+        # Try LLM-based consensus first
+        if self.use_llm_consensus:
             try:
-                # Run FeatureAnalyzer
-                fa_analysis = self.feature_analyzer.analyze_threat(threat)
-                classification = fa_analysis.get("classification", "NEEDS_LLM_REVIEW")
-                
-                # Track classification
-                fa_classifications[classification] = fa_classifications.get(classification, 0) + 1
-                
-                # Store result
-                result = {
-                    "threat": threat,
-                    "analysis": fa_analysis
-                }
-                results.append(result)
-                
+                llm_decision = self._llm_consensus_decision(
+                    threat_data, fa_result, fa_unified_class, fa_confidence,
+                    context_result, context_class, context_confidence, ml_confidence
+                )
+
+                if llm_decision:
+                    return llm_decision
+
             except Exception as e:
-                stats["errors"] += 1
-                logger.error(f"❌ Error analyzing threat {idx}: {e}")
-                results.append({
-                    "threat": threat,
-                    "analysis": {"classification": "ERROR", "error": str(e)}
-                })
-        
-        # Display Feature Analysis Results
-        fa_stats = {
-            "Total Threats": len(aggregated_threats),
-            "False Positives": fa_classifications.get("FALSE_POSITIVE", 0),
-            "Possible Threats": fa_classifications.get("POSSIBLE_THREAT", 0),
-            "Needs LLM Review": fa_classifications.get("NEEDS_LLM_REVIEW", 0),
-            "Errors": stats['errors']
-        }
-        print_stats_box(fa_stats, Colors.GREEN)
-        
-        # ========================================================================
-        # STEP 3: LLM VALIDATION (if enabled and needed)
-        # ========================================================================
-        needs_llm_count = fa_classifications.get("NEEDS_LLM_REVIEW", 0)
-        
-        if needs_llm_count > 0:
-            if self.enable_llm_validation and self.llm_validator:
-                print_validation_header("🤖 LLM VALIDATION PHASE")
-                print_info_box([
-                    f"Running LLM validation on {needs_llm_count} ambiguous threats...",
-                    f"Using model: {self.llm_validator.model}"
-                ], Colors.YELLOW)
-                
-                llm_count = 0
-                for result in results:
-                    fa_classification = result['analysis'].get('classification')
-                    
-                    if fa_classification == "NEEDS_LLM_REVIEW":
-                        try:
-                            threat = result['threat']
-                            fa_analysis = result['analysis']
-                            
-                            llm_count += 1
-                            print(f"   🤖 Validating threat {llm_count}/{needs_llm_count}: {threat.get('ip', 'unknown')}")
-                            
-                            # Run LLM validation
-                            llm_result = self.llm_validator.validate(threat, fa_analysis)
-                            result['llm_validation'] = llm_result
-                            
-                            # Track decision
-                            decision = llm_result.get('decision', 'UNKNOWN')
-                            llm_decisions[decision] = llm_decisions.get(decision, 0) + 1
-                            
-                        except Exception as e:
-                            logger.error(f"❌ LLM validation error: {e}")
-                            result['llm_validation'] = {
-                                "decision": "ERROR",
-                                "error": str(e),
-                                "validator_used": "fallback"
-                            }
-                
-                # Calculate average latency
-                valid_latencies = [
-                    r['llm_validation']['latency_ms'] 
-                    for r in results 
-                    if 'llm_validation' in r and 'latency_ms' in r['llm_validation']
-                ]
-                avg_latency = sum(valid_latencies) / len(valid_latencies) if valid_latencies else 0
-                
-                llm_stats = {
-                    "LLM Validations": len([r for r in results if 'llm_validation' in r]),
-                    "Real Threats": llm_decisions.get("REAL_THREAT", 0),
-                    "Suspicious": llm_decisions.get("SUSPICIOUS", 0),
-                    "Benign": llm_decisions.get("BENIGN", 0),
-                    "False Positives": llm_decisions.get("FALSE_POSITIVE", 0),
-                    "Average Latency (ms)": round(avg_latency, 2)
+                if self.enable_logging:
+                    logging.warning(f"LLM consensus failed: {e}. Falling back to rule-based aggregation.")
+
+        # Fallback to rule-based aggregation
+        return self._rule_based_aggregation(
+            threat_data, fa_result, fa_unified_class, fa_confidence,
+            context_result, context_class, context_confidence, ml_confidence
+        )
+
+    def _rule_based_aggregation(
+        self,
+        threat_data: Dict,
+        fa_result: Dict,
+        fa_unified_class: str,
+        fa_confidence: float,
+        context_result: Dict,
+        context_class: str,
+        context_confidence: float,
+        ml_confidence: float
+    ) -> Dict[str, Any]:
+        """
+        Rule-based decision aggregation (fallback when LLM unavailable).
+
+        Args:
+            threat_data: Original threat data
+            fa_result: Feature Analyzer result
+            fa_unified_class: Mapped Feature Analyzer classification
+            fa_confidence: Feature Analyzer confidence
+            context_result: Context Agent result
+            context_class: Context Agent classification
+            context_confidence: Context Agent confidence
+            ml_confidence: ML model confidence
+
+        Returns:
+            Unified validation result
+        """
+        # Check for agreement
+        if fa_unified_class == context_class:
+            # Agents agree - combine confidences
+            final_classification = fa_unified_class
+            combined_confidence = self._calculate_combined_confidence(
+                ml_confidence, fa_confidence, context_confidence
+            )
+            reasoning = self._combine_reasoning(
+                fa_result.get("reasoning", ""),
+                context_result.get("reasoning", ""),
+                agreement=True
+            )
+
+        else:
+            # Agents disagree - resolve conflict
+            final_classification, combined_confidence, reasoning = self._resolve_conflict(
+                fa_unified_class, fa_confidence,
+                context_class, context_confidence,
+                fa_result.get("reasoning", ""),
+                context_result.get("reasoning", "")
+            )
+
+        # Determine recommendation
+        recommendation = self._get_recommendation(final_classification, combined_confidence)
+
+        return {
+            "classification": final_classification,
+            "confidence": round(combined_confidence, 3),
+            "recommendation": recommendation,
+            "reasoning": reasoning,
+            "agent_opinions": {
+                "feature_analyzer": {
+                    "classification": fa_result.get("classification"),
+                    "unified_classification": fa_unified_class,
+                    "confidence": fa_confidence,
+                    "reasoning": fa_result.get("reasoning", ""),
+                    "flags": fa_result.get("heuristic_flags", [])
+                },
+                "context_agent": {
+                    "classification": context_class,
+                    "confidence": context_confidence,
+                    "reasoning": context_result.get("reasoning", ""),
+                    "evidence": context_result.get("key_evidence", [])
                 }
-                print_stats_box(llm_stats, Colors.BLUE)
-            else:
-                print_info_box([
-                    f"⚠️  {needs_llm_count} threats need LLM review",
-                    f"   LLM validation is disabled or unavailable",
-                    f"   Passing through conservatively"
-                ], Colors.YELLOW)
-        
-        # ========================================================================
-        # STEP 4: FINAL CLASSIFICATION
-        # ========================================================================
-        validated_threats = []
-        
-        for result in results:
-            classification = result['analysis'].get('classification')
-            llm_validation = result.get('llm_validation', {})
-            llm_decision = llm_validation.get('decision', '')
-            
-            should_validate = False
-            
-            if classification == "POSSIBLE_THREAT":
-                should_validate = True
-                stats["heuristic_validated"] += 1
-            
-            elif classification == "FALSE_POSITIVE":
-                should_validate = False
-                stats["filtered_false_positive"] += 1
-            
-            elif classification == "NEEDS_LLM_REVIEW":
-                if llm_decision in ["REAL_THREAT", "SUSPICIOUS"]:
-                    should_validate = True
-                    stats["llm_validated"] += 1
-                elif llm_decision in ["BENIGN", "FALSE_POSITIVE"]:
-                    should_validate = False
-                    stats["filtered_benign"] += 1
-                else:
-                    should_validate = True
-            
-            elif classification == "ERROR":
-                should_validate = True
-            
-            if should_validate:
-                stats["validated"] += 1
-                validated_threats.append(result)
-        
-        # ========================================================================
-        # STEP 5: STORE IN CHROMADB
-        # ========================================================================
-        print_validation_header("💾 STORING IN CHROMADB")
-        
-        stored_count = store_threats_in_chroma(validated_threats, self.chroma_client)
-        stats["stored_in_chromadb"] = stored_count
-        
-        # Final Summary
-        final_stats = {
-            "Total Alerts": stats['total_alerts'],
-            "Aggregated Threats": len(aggregated_threats),
-            "Validated": stats['validated'],
-            "Filtered (False Positive)": stats['filtered_false_positive'],
-            "Filtered (Benign)": stats['filtered_benign'],
-            "Heuristic Validated": stats['heuristic_validated'],
-            "LLM Validated": stats['llm_validated'],
-            "Stored in ChromaDB": stats['stored_in_chromadb'],
-            "Errors": stats['errors']
+            },
+            "confidence_breakdown": {
+                "ml_confidence": round(ml_confidence, 3),
+                "feature_analyzer_confidence": round(fa_confidence, 3),
+                "context_agent_confidence": round(context_confidence, 3),
+                "combined_confidence": round(combined_confidence, 3),
+                "weights": self.confidence_weights
+            },
+            "decision_path": "rule_based_aggregation"
         }
-        print_stats_box(final_stats, Colors.CYAN)
-        
-        return validated_threats, stats
-    
-    def _convert_eve_to_threat(self, eve_alert: Dict) -> Dict:
+
+    def _map_fa_classification(self, fa_class: str) -> str:
         """
-        Convert Suricata eve.json alert to threat format for FeatureAnalyzer.
-        
-        Args:
-            eve_alert: Single alert from eve.json
-        
-        Returns:
-            Threat dictionary in FeatureAnalyzer format
+        Map Feature Analyzer classification to unified scheme.
+
+        Feature Analyzer classes:
+            FALSE_POSITIVE, POSSIBLE_THREAT, NEEDS_LLM_REVIEW
+
+        Unified classes:
+            REAL_THREAT, SUSPICIOUS, FALSE_POSITIVE, BENIGN_ANOMALY
         """
-        alert_data = eve_alert.get("alert", {})
-        timestamp = eve_alert.get("timestamp", "")
-        src_ip = eve_alert.get("src_ip", "unknown")
-        dest_ip = eve_alert.get("dest_ip", "unknown")
-        dest_port = eve_alert.get("dest_port", 0)
-        signature_id = alert_data.get("signature_id", 0)
-        signature = alert_data.get("signature", "")
-        severity = alert_data.get("severity", 3)
-        
-        # Map severity (1=high, 2=medium, 3=low in Suricata)
-        severity_map = {1: "HIGH", 2: "MEDIUM", 3: "LOW"}
-        severity_str = severity_map.get(severity, "MEDIUM")
-        
-        threat = {
-            "ip": src_ip,
-            "severity": severity_str,
-            "severity_level": severity,
-            "confidence_score": 0.5,
-            "attack_type": signature,
-            "total_events": 1,
-            "rules_violated": [{
-                "rule_id": signature_id,
-                "rule_name": signature,
-                "severity": severity_str
-            }],
-            "timestamps": [timestamp],
-            "src_ips": [src_ip],
-            "dest_ips": [dest_ip],
-            "ports": [dest_port],
-            "ml_anomalies": []
+        mapping = {
+            "FALSE_POSITIVE": self.FALSE_POSITIVE,
+            "POSSIBLE_THREAT": self.SUSPICIOUS,  # Ambiguous, needs review
+            "NEEDS_LLM_REVIEW": self.SUSPICIOUS  # Uncertain, needs review
         }
-        
-        return threat
-    
-    def _aggregate_alerts_by_ip(self, raw_alerts: List[Dict]) -> List[Dict]:
+        return mapping.get(fa_class, self.SUSPICIOUS)
+
+    def _calculate_combined_confidence(
+        self,
+        ml_confidence: float,
+        fa_confidence: float,
+        context_confidence: float
+    ) -> float:
         """
-        Aggregate individual eve.json alerts into threat summaries by source IP.
-        This mimics the format from api_response.json.
-        
-        Args:
-            raw_alerts: List of individual eve.json alert records
-        
+        Calculate weighted combined confidence score.
+
+        Uses configured weights:
+            - ML Model: 20%
+            - Feature Analyzer: 30%
+            - Context Agent: 50%
+
         Returns:
-            List of aggregated threat dictionaries
+            Combined confidence score (0.0 to 1.0)
         """
-        from collections import defaultdict
-        from dateutil import parser as date_parser
-        
-        # Group by source IP
-        ip_groups = defaultdict(lambda: {
-            "alerts": [],
-            "timestamps": [],
-            "src_ips": set(),
-            "dest_ips": set(),
-            "ports": set(),
-            "signature_ids": set(),
-            "severities": [],
-            "attack_types": set()
-        })
-        
-        for alert in raw_alerts:
-            src_ip = alert.get("src_ip", "unknown")
-            
-            group = ip_groups[src_ip]
-            group["alerts"].append(alert)
-            
-            # Convert timestamp string to datetime object
-            if alert.get("timestamp"):
-                try:
-                    # Parse ISO 8601 timestamp
-                    timestamp_str = alert["timestamp"]
-                    timestamp_dt = date_parser.parse(timestamp_str)
-                    group["timestamps"].append(timestamp_dt)
-                except Exception as e:
-                    logger.warning(f"⚠️  Failed to parse timestamp: {timestamp_str}")
-        
-            group["src_ips"].add(src_ip)
-            if alert.get("dest_ip"):
-                group["dest_ips"].add(alert["dest_ip"])
-            if alert.get("dest_port"):
-                group["ports"].add(alert["dest_port"])
-            
-            alert_data = alert.get("alert", {})
-            if alert_data.get("signature_id"):
-                group["signature_ids"].add(str(alert_data["signature_id"]))
-            if alert_data.get("severity"):
-                group["severities"].append(alert_data["severity"])
-            if alert_data.get("signature"):
-                group["attack_types"].add(alert_data["signature"])
-        
-        # Convert to threat format
-        aggregated_threats = []
-        
-        for ip, data in ip_groups.items():
-            # Calculate severity (1=HIGH, 2=MEDIUM, 3=LOW in Suricata)
-            avg_severity = sum(data["severities"]) / len(data["severities"]) if data["severities"] else 3
-            
-            if avg_severity <= 1.5:
-                severity_str = "HIGH"
-                severity_level = 1
-            elif avg_severity <= 2.5:
-                severity_str = "MEDIUM"
-                severity_level = 2
+        combined = (
+            ml_confidence * self.confidence_weights["ml_model"] +
+            fa_confidence * self.confidence_weights["feature_analyzer"] +
+            context_confidence * self.confidence_weights["context_agent"]
+        )
+
+        return max(0.0, min(1.0, combined))
+
+    def _resolve_conflict(
+        self,
+        fa_class: str,
+        fa_conf: float,
+        context_class: str,
+        context_conf: float,
+        fa_reasoning: str,
+        context_reasoning: str
+    ) -> Tuple[str, float, str]:
+        """
+        Resolve conflicts when agents disagree.
+
+        Conflict resolution strategy:
+        1. If confidence difference > 0.3: Trust higher confidence agent
+        2. If Context Agent says REAL_THREAT with confidence > 0.7: Escalate
+        3. If Feature Analyzer says FALSE_POSITIVE with confidence > 0.7: Filter
+        4. Otherwise: Mark as SUSPICIOUS (requires manual review)
+
+        Returns:
+            Tuple of (classification, confidence, reasoning)
+        """
+        confidence_diff = abs(fa_conf - context_conf)
+
+        # Rule 1: Large confidence difference - trust higher confidence agent
+        if confidence_diff > 0.3:
+            if fa_conf > context_conf:
+                return fa_class, fa_conf, f"Feature Analyzer (high confidence): {fa_reasoning}"
             else:
-                severity_str = "LOW"
-                severity_level = 3
-            
-            # Determine attack type
-            attack_type = "Reconnaissance / Scanning" if len(data["ports"]) > 3 else (
-                list(data["attack_types"])[0] if data["attack_types"] else "Suspicious Activity"
+                return context_class, context_conf, f"Context Agent (high confidence): {context_reasoning}"
+
+        # Rule 2: Context Agent says REAL_THREAT with high confidence - escalate
+        if context_class == self.REAL_THREAT and context_conf > 0.7:
+            return self.REAL_THREAT, context_conf, f"Context Agent detected threat (overriding heuristic): {context_reasoning}"
+
+        # Rule 3: Feature Analyzer says FALSE_POSITIVE with high confidence - filter
+        if fa_class == self.FALSE_POSITIVE and fa_conf > 0.7:
+            return self.FALSE_POSITIVE, fa_conf, f"Feature Analyzer filtered (overriding context): {fa_reasoning}"
+
+        # Rule 4: Conflicting signals with similar confidence - mark as SUSPICIOUS
+        avg_confidence = (fa_conf + context_conf) / 2.0
+        return (
+            self.SUSPICIOUS,
+            avg_confidence,
+            f"Conflicting signals (FA: {fa_class}, Context: {context_class}). Manual review recommended."
+        )
+
+    def _combine_reasoning(self, fa_reasoning: str, context_reasoning: str, agreement: bool) -> str:
+        """Combine reasoning from both agents into unified explanation."""
+        if agreement:
+            return f"Both agents agree. Heuristic: {fa_reasoning} | Context: {context_reasoning}"
+        else:
+            return f"Agents disagree. Heuristic: {fa_reasoning} | Context: {context_reasoning}"
+
+    def _get_recommendation(self, classification: str, confidence: float) -> str:
+        """
+        Determine recommendation based on classification and confidence.
+
+        Returns:
+            "filter", "review", or "escalate"
+        """
+        if classification == self.FALSE_POSITIVE and confidence > 0.7:
+            return self.FILTER
+
+        elif classification == self.REAL_THREAT and confidence > 0.7:
+            return self.ESCALATE
+
+        elif classification == self.BENIGN_ANOMALY:
+            return self.FILTER  # Log but don't alert
+
+        else:
+            # SUSPICIOUS or low confidence - requires manual review
+            return self.REVIEW
+
+    def _build_fast_path_result(
+        self,
+        threat_data: Dict,
+        fa_result: Dict,
+        classification: str,
+        latency_ms: int
+    ) -> Dict[str, Any]:
+        """Build result for fast-path optimization (skipping Context Agent)."""
+        ml_confidence = threat_data.get("confidence_score", 0.5)
+        fa_confidence = fa_result.get("feature_analyzer_confidence_score", 0.5)
+
+        # For fast path, combine only ML and Feature Analyzer confidence
+        # (no Context Agent contribution)
+        combined_confidence = (
+            ml_confidence * self.confidence_weights["ml_model"] +
+            fa_confidence * self.confidence_weights["feature_analyzer"]
+        ) / (self.confidence_weights["ml_model"] + self.confidence_weights["feature_analyzer"])
+
+        recommendation = self._get_recommendation(classification, combined_confidence)
+
+        return {
+            "classification": classification,
+            "confidence": round(combined_confidence, 3),
+            "recommendation": recommendation,
+            "reasoning": f"Fast-path decision: {fa_result.get('reasoning', '')}",
+            "agent_opinions": {
+                "feature_analyzer": {
+                    "classification": fa_result.get("classification"),
+                    "unified_classification": classification,
+                    "confidence": fa_confidence,
+                    "reasoning": fa_result.get("reasoning", ""),
+                    "flags": fa_result.get("heuristic_flags", [])
+                },
+                "context_agent": {
+                    "classification": "SKIPPED",
+                    "confidence": None,
+                    "reasoning": "Skipped due to high-confidence fast-path decision",
+                    "evidence": []
+                }
+            },
+            "confidence_breakdown": {
+                "ml_confidence": round(ml_confidence, 3),
+                "feature_analyzer_confidence": round(fa_confidence, 3),
+                "context_agent_confidence": None,
+                "combined_confidence": round(combined_confidence, 3),
+                "weights": self.confidence_weights
+            },
+            "decision_path": "fast_filter" if classification == self.FALSE_POSITIVE else "heuristic_pass",
+            "latency_ms": latency_ms
+        }
+
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Get orchestrator statistics and configuration.
+
+        Returns:
+            Dictionary with orchestrator configuration and agent info
+        """
+        return {
+            "agents": {
+                "feature_analyzer": "FeatureAnalyzer (heuristic)",
+                "context_agent": "ContextAgent (RAG + LLM)"
+            },
+            "confidence_weights": self.confidence_weights,
+            "fast_path_threshold": self.fast_path_threshold,
+            "use_llm_consensus": self.use_llm_consensus,
+            "consensus_model": self.consensus_model,
+            "classification_scheme": {
+                "categories": [self.REAL_THREAT, self.SUSPICIOUS, self.FALSE_POSITIVE, self.BENIGN_ANOMALY],
+                "recommendations": [self.FILTER, self.REVIEW, self.ESCALATE]
+            }
+        }
+
+    def _load_consensus_prompt(self) -> str:
+        """Load consensus prompt template from file."""
+        try:
+            prompt_path = Path(__file__).parent / "prompts" / "consensus_prompt.md"
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            if self.enable_logging:
+                logging.warning(f"Failed to load consensus prompt template: {e}")
+            # Return minimal fallback template
+            return """You are a Consensus Agent. Analyze the following agent opinions and make a final decision.
+
+Threat: {ip} - {attack_type} (Severity: {severity}, ML Confidence: {ml_confidence})
+
+Feature Analyzer: {fa_classification} (confidence: {fa_confidence})
+Reasoning: {fa_reasoning}
+
+Context Agent: {context_classification} (confidence: {context_confidence})
+Reasoning: {context_reasoning}
+
+Provide your decision in JSON format:
+{
+  "classification": "REAL_THREAT | SUSPICIOUS | FALSE_POSITIVE | BENIGN_ANOMALY",
+  "confidence": 0.0-1.0,
+  "recommendation": "escalate | review | filter",
+  "reasoning": "your explanation",
+  "decision_factors": ["factor1", "factor2"],
+  "agent_agreement": "agreed | disagreed",
+  "primary_influence": "feature_analyzer | context_agent | both | conservative_fallback"
+}"""
+
+    def _llm_consensus_decision(
+        self,
+        threat_data: Dict,
+        fa_result: Dict,
+        fa_unified_class: str,
+        fa_confidence: float,
+        context_result: Dict,
+        context_class: str,
+        context_confidence: float,
+        ml_confidence: float
+    ) -> Optional[Dict[str, Any]]:
+        """Use LLM to make consensus decision by analyzing both agents' opinions."""
+        
+        prompt = self.consensus_prompt_template.format(
+            ip=threat_data.get("ip", "unknown"),
+            attack_type=threat_data.get("attack_type", "unknown"),
+            severity=threat_data.get("severity", "unknown"),
+            ml_confidence=f"{ml_confidence:.2f}",
+            description=threat_data.get("description", ""),
+            timestamp=threat_data.get("timestamp", ""),
+            total_events=threat_data.get("total_events", 0),
+            fa_classification=fa_unified_class,
+            fa_confidence=f"{fa_confidence:.2f}",
+            fa_reasoning=fa_result.get("reasoning", ""),
+            fa_flags=", ".join(fa_result.get("heuristic_flags", [])),
+            context_classification=context_class,
+            context_confidence=f"{context_confidence:.2f}",
+            context_reasoning=context_result.get("reasoning", ""),
+            context_evidence=", ".join(context_result.get("key_evidence", []))
+        )
+
+        if self.enable_logging:
+            logging.info("Calling LLM for consensus decision")
+
+        try:
+            response = ollama.chat(
+                model=self.consensus_model,
+                messages=[{"role": "user", "content": prompt}],
+                format="json",
+                options={"temperature": 0.1, "top_p": 0.9}
             )
             
-            # Build rules violated
-            rules_violated = []
-            if len(data["alerts"]) >= 10:
-                rules_violated.append({
-                    "rule_id": "suricata_alert_storm",
-                    "description": f"High volume of Suricata alerts (>={len(data['alerts'])} in 4h)",
-                    "severity": "high",
-                    "count": len(data["alerts"]),
-                    "threshold": 10,
-                    "window": "4h"
-                })
+            llm_output = response["message"]["content"].strip()
             
-            if len(data["alerts"]) >= 5:
-                rules_violated.append({
-                    "rule_id": "suspicious_src_ip",
-                    "description": "Single IP generating many alerts (>=5 in 4h)",
-                    "severity": "high",
-                    "group": ip,
-                    "count": len(data["alerts"]),
-                    "threshold": 5,
-                    "window": "4h"
-                })
+            # ✅ ROBUST JSON EXTRACTION
+            import re
             
-            threat = {
-                "ip": ip,
-                "severity": severity_str,
-                "severity_level": severity_level,
-                "confidence_score": min(0.4 + (len(data["alerts"]) * 0.01), 1.0),
-                "attack_type": attack_type,
-                "total_events": len(data["alerts"]),
-                "rules_violated": rules_violated,
-                "ml_anomalies": [],
-                "timestamps": sorted(data["timestamps"]),  # Now datetime objects
-                "src_ips": list(data["src_ips"]),
-                "dest_ips": list(data["dest_ips"]),
-                "ports": list(data["ports"])
+            # Remove markdown code blocks
+            if "```json" in llm_output:
+                llm_output = llm_output.split("```json")[1].split("```")[0]
+            elif "```" in llm_output:
+                llm_output = llm_output.split("```")[1].split("```")[0]
+            
+            # Extract JSON object
+            json_match = re.search(r'\{.*\}', llm_output, re.DOTALL)
+            if json_match:
+                llm_output = json_match.group()
+            
+            consensus_result = json.loads(llm_output)
+            
+            # Validate required fields
+            if "classification" not in consensus_result:
+                if self.enable_logging:
+                    logging.warning(f"LLM response missing 'classification' field")
+                return None
+            
+            classification = consensus_result.get("classification", "").upper()
+            valid_classes = [self.REAL_THREAT, self.SUSPICIOUS, self.FALSE_POSITIVE, self.BENIGN_ANOMALY]
+            
+            if classification not in valid_classes:
+                if self.enable_logging:
+                    logging.warning(f"Invalid LLM classification: {classification}")
+                return None
+            
+            confidence = float(consensus_result.get("confidence", 0.5))
+            confidence = max(0.0, min(1.0, confidence))
+            
+            return {
+                "classification": classification,
+                "confidence": round(confidence, 3),
+                "recommendation": consensus_result.get("recommendation", self._get_recommendation(classification, confidence)),
+                "reasoning": consensus_result.get("reasoning", "LLM consensus decision"),
+                "agent_opinions": {
+                    "feature_analyzer": {
+                        "classification": fa_result.get("classification"),
+                        "unified_classification": fa_unified_class,
+                        "confidence": fa_confidence,
+                        "reasoning": fa_result.get("reasoning", "")
+                    },
+                    "context_agent": {
+                        "classification": context_class,
+                        "confidence": context_confidence,
+                        "reasoning": context_result.get("reasoning", "")
+                    }
+                },
+                "confidence_breakdown": {
+                    "ml_confidence": round(ml_confidence, 3),
+                    "feature_analyzer_confidence": round(fa_confidence, 3),
+                    "context_agent_confidence": round(context_confidence, 3),
+                    "combined_confidence": round(confidence, 3),
+                    "weights": self.confidence_weights
+                },
+                "decision_path": "llm_consensus"
             }
             
-            aggregated_threats.append(threat)
-        
-        # Sort by total_events descending
-        aggregated_threats.sort(key=lambda x: x["total_events"], reverse=True)
-        
-        return aggregated_threats
+        except json.JSONDecodeError as je:
+            if self.enable_logging:
+                logging.error(f"JSON parse failed: {je}")
+            return None
+        except Exception as e:
+            if self.enable_logging:
+                logging.error(f"LLM consensus error: {e}")
+            return None
 
+    def _get_llm_consensus(
+        self,
+        feature_result: Dict,
+        context_result: Dict,
+        threat_data: Dict
+    ) -> Dict:
+        """Use LLM to make final consensus decision between agents."""
+        try:
+            if self.enable_logging:
+                logging.info("Requesting LLM consensus between agents")
+            
+            prompt = self._build_consensus_prompt(
+                feature_result,
+                context_result,
+                threat_data
+            )
+            
+            # Call LLM with JSON format enforcement
+            response = ollama.chat(
+                model=self.consensus_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are a security expert. Output MUST be valid JSON only. No markdown, no code blocks, no extra text. Start with { and end with }."
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                format="json",
+                options={
+                    "temperature": 0.1,
+                    "top_p": 0.9,
+                    "num_predict": 500
+                }
+            )
+            
+            # Extract and clean response
+            llm_output = response["message"]["content"].strip()
+            
+            # ✅ ROBUST JSON EXTRACTION
+            # Remove markdown code blocks if present
+            if "```" in llm_output:
+                llm_output = llm_output.replace("```json", "").replace("```", "").strip()
+            
+            # Find JSON object using regex (handles leading/trailing text)
+            import re
+            json_match = re.search(r'\{.*\}', llm_output, re.DOTALL)
+            if json_match:
+                llm_output = json_match.group()
+            
+            # Parse JSON
+            consensus = json.loads(llm_output)
+            
+            if self.enable_logging:
+                logging.info(f"✅ LLM consensus: {consensus.get('classification', 'UNKNOWN')}")
+            
+            return consensus
+            
+        except json.JSONDecodeError as je:
+            logging.error(f"LLM consensus JSON parse failed: {str(je)}")
+            logging.error(f"Raw output: {repr(llm_output[:200])}")
+            return None
+            
+        except Exception as e:
+            logging.error(f"Error getting LLM consensus: {str(e)}")
+            return None
 
-# ============================================================================
-# MAIN (for testing)
-# ============================================================================
-def main():
-    """Test validation orchestrator."""
-    
-    print(f"\n{Colors.BOLD}{Colors.GREEN}{'█' * 80}{Colors.ENDC}")
-    print(f"{Colors.BOLD}{Colors.GREEN}█  🔐 SECURITY VALIDATION PIPELINE{' ' * (43)}{Colors.ENDC}{Colors.GREEN}█{Colors.ENDC}{Colors.BOLD}")
-    print(f"{Colors.GREEN}{'█' * 80}{Colors.ENDC}\n")
-    
-    # Path to eve.json
-    eve_json_path = Path(__file__).parent.parent.parent / "logs" / "eve.json"
-    
-    if not eve_json_path.exists():
-        print_info_box([
-            f"❌ eve.json not found",
-            f"   Expected: {eve_json_path}"
-        ], Colors.RED)
-        return
-    
-    # Initialize orchestrator
-    orchestrator = ValidationOrchestrator(
-        enable_llm_validation=True,
-        enable_logging=False
-    )
-    
-    # Run validation
-    try:
-        validated_alerts, stats = orchestrator.validate_eve_json(str(eve_json_path))
+    def _build_consensus_prompt(
+        self,
+        feature_result: Dict,
+        context_result: Dict,
+        threat_data: Dict
+    ) -> str:
+        """Build prompt for LLM consensus decision."""
         
-        # Save results
-        output_path = Path(__file__).parent.parent.parent / "logs" / "validated_threats.json"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(output_path, 'w') as f:
-            json.dump({
-                "summary": stats,
-                "detailed_results": validated_alerts
-            }, f, indent=2, cls=DateTimeEncoder)
-        
-        print_info_box([
-            f"✅ Validation complete",
-            f"   • Results: {output_path}"
-        ], Colors.GREEN)
-        
-        print(f"\n{Colors.BOLD}{Colors.GREEN}{'█' * 80}{Colors.ENDC}")
-        print(f"{Colors.BOLD}{Colors.GREEN}█  ✅ VALIDATION COMPLETE{' ' * (52)}{Colors.ENDC}{Colors.GREEN}█{Colors.ENDC}{Colors.BOLD}")
-        print(f"{Colors.GREEN}{'█' * 80}{Colors.ENDC}\n")
-        
-    except Exception as e:
-        print_info_box([f"❌ Validation failed: {e}"], Colors.RED)
-        import traceback
-        traceback.print_exc()
+        # ✅ EMBEDDED CONSENSUS PROMPT
+        return f"""You are a security expert making a final consensus decision.
 
+## THREAT DETAILS
+- **IP**: {threat_data.get('ip', 'unknown')}
+- **Attack Type**: {threat_data.get('attack_type', 'unknown')}
+- **Severity**: {threat_data.get('severity', 'unknown')}
+- **Total Events**: {threat_data.get('total_events', 0)}
 
-if __name__ == "__main__":
-    main()
+## FEATURE ANALYZER OPINION
+- **Classification**: {feature_result.get('classification', 'UNKNOWN')}
+- **Confidence**: {feature_result.get('confidence', 0.0):.2f}
+- **Reasoning**: {feature_result.get('reasoning', 'No reasoning provided')}
+
+## CONTEXT AGENT OPINION
+- **Classification**: {context_result.get('classification', 'UNKNOWN')}
+- **Confidence**: {context_result.get('confidence', 0.0):.2f}
+- **Reasoning**: {context_result.get('reasoning', 'No reasoning provided')}
+
+## YOUR TASK
+Make a final consensus decision considering both analyses.
+
+Return ONLY valid JSON (no markdown, no extra text):
+{{
+  "classification": "REAL_THREAT|SUSPICIOUS|FALSE_POSITIVE|BENIGN_ANOMALY",
+  "confidence": 0.85,
+  "reasoning": "Your reasoning here",
+  "recommendation": "escalate|review|filter",
+  "key_evidence": ""]
+}}
+"""

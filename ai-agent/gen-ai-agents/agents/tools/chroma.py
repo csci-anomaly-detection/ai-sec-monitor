@@ -3,24 +3,62 @@ from chromadb.utils import embedding_functions
 import os
 import json
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # ============================================================================
-# UNIFIED EMBEDDING FUNCTION - Use same across all collections
+# OLLAMA EMBEDDING FUNCTION (nomic-embed-text)
 # ============================================================================
 
-# Use DefaultEmbeddingFunction everywhere for consistency
-embedding_fn = embedding_functions.DefaultEmbeddingFunction()
-logger.info("✅ Using DefaultEmbeddingFunction for all collections")
+class OllamaEmbeddingFunction(embedding_functions.EmbeddingFunction):
+    """
+    Custom embedding function that calls Ollama's /api/embeddings endpoint.
+    Uses the 'nomic-embed-text' model by default.
+    """
 
+    def __init__(self, model: str = None, host: str = None, port: int = None, timeout: int = 30):
+        self.model = model or os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+        self.host = host or os.getenv("OLLAMA_HOST", "localhost")
+        self.port = int(port or os.getenv("OLLAMA_PORT", "11434"))
+        self.timeout = timeout
+        self.base_url = f"http://{self.host}:{self.port}/api/embeddings"
+        logger.info(f"✅ Using Ollama embedding model: {self.model} at {self.base_url}")
+
+    def __call__(self, texts: list[str]) -> list[list[float]]:
+        if not isinstance(texts, list):
+            texts = [texts]
+
+        embeddings: list[list[float]] = []
+        for t in texts:
+            try:
+                resp = requests.post(
+                    self.base_url,
+                    json={"model": self.model, "prompt": t},
+                    timeout=self.timeout,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                vec = data.get("embedding")
+                if not isinstance(vec, list):
+                    raise ValueError(f"Invalid embedding response: {data}")
+                embeddings.append(vec)
+            except Exception as e:
+                logger.error(f"❌ Ollama embedding failed: {e}")
+                # Fallback: zero vector of nominal length (nomic-embed-text is 768 dims)
+                embeddings.append([0.0] * 768)
+        return embeddings
+
+# Instantiate the embedding function
+embedding_fn = OllamaEmbeddingFunction()
+logger.info("✅ OllamaEmbeddingFunction initialized (nomic-embed-text)")
 
 def get_chroma_client():
     """Get ChromaDB client with error handling"""
     CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
     CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
-    
+
     try:
         client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
         return client
@@ -28,6 +66,21 @@ def get_chroma_client():
         logger.error(f"❌ Failed to connect to ChromaDB at {CHROMA_HOST}:{CHROMA_PORT}")
         raise
 
+def get_or_create_collection(name: str):
+    """
+    Get or create a ChromaDB collection using the Ollama embedding function.
+    This ensures new documents use nomic-embed-text embeddings.
+    """
+    client = get_chroma_client()
+    try:
+        # Try to get existing collection first (without embedding function)
+        col = client.get_collection(name=name)
+        logger.info(f"📚 Using existing collection '{name}'")
+        return col
+    except Exception:
+        # Create with embedding function if not exists
+        logger.info(f"🆕 Creating collection '{name}' with Ollama embeddings")
+        return client.get_or_create_collection(name=name, embedding_function=embedding_fn)
 
 def query_chroma(query_input: str):
     """
@@ -57,14 +110,14 @@ def query_chroma(query_input: str):
     signature_id = parts[1] if len(parts) > 1 else None
     
     # Validate collection name
-    valid_collections = ["all_logs", "suricata_rules", "batched_alerts", "mitre_attack", "all_threats", "analyst_reports"]
+    valid_collections = ["all_logs", "suricata_rules", "batched_alerts", "mitre_attack", "all_threats", "analyst_reports", "attack_mitigation_knowledge"]
     if collection_name not in valid_collections:
         return json.dumps({
             "error": f"Invalid collection '{collection_name}'. Valid options: {', '.join(valid_collections)}"
         })
     
     try:
-        col = client.get_collection(collection_name)
+        col = get_or_create_collection(collection_name)
         
         # Build where filter if signature_id provided
         where_filter = None
@@ -127,7 +180,7 @@ def query_chroma(query_input: str):
         logger.info(f"✅ Query successful: {collection_name} returned {len(results)} results")
         return json.dumps(response, indent=2)
         
-    except ValueError as e:
+    except ValueError:
         # Collection doesn't exist
         logger.warning(f"⚠️ Collection '{collection_name}' does not exist")
         return json.dumps({
@@ -158,12 +211,7 @@ def query_chroma_advanced(collection_name: str, where: dict = None, limit: int =
     """
     
     try:
-        client = get_chroma_client()
-    except Exception as e:
-        return json.dumps({"error": f"Failed to connect to ChromaDB: {str(e)}"})
-    
-    try:
-        col = client.get_collection(collection_name)
+        col = get_or_create_collection(collection_name)
         logger.info(f"✅ Querying collection: {collection_name}")
         
         data = col.get(
@@ -204,18 +252,7 @@ def query_chroma_semantic(query_text: str, collection_name: str = "all_threats",
     """
     
     try:
-        client = get_chroma_client()
-    except Exception as e:
-        return json.dumps({"error": f"Failed to connect to ChromaDB: {str(e)}"})
-    
-    try:
-        # Get collection WITHOUT specifying embedding_function
-        # This forces ChromaDB to use the one already stored in the collection
-        col = client.get_collection(
-            name=collection_name
-            # ⚠️ DO NOT pass embedding_function here - it causes conflicts!
-        )
-        
+        col = get_or_create_collection(collection_name)
         logger.info(f"✅ Querying collection '{collection_name}' semantically")
         logger.info(f"   Query: '{query_text}'")
         
@@ -265,47 +302,27 @@ def query_chroma_semantic(query_text: str, collection_name: str = "all_threats",
 def get_collection_stats(collection_name: str):
     """Get statistics about a collection"""
     try:
-        client = get_chroma_client()
-        col = client.get_collection(collection_name)
-        
-        # Get total count
+        col = get_or_create_collection(collection_name)
         all_data = col.get(limit=1)
         total = len(all_data['ids']) if all_data['ids'] else 0
-        
         logger.info(f"📊 Collection '{collection_name}': {total} documents")
-        
-        return {
-            "collection": collection_name,
-            "total_documents": total,
-            "status": "OK"
-        }
+        return {"collection": collection_name, "total_documents": total, "status": "OK"}
     except Exception as e:
         logger.error(f"❌ Could not get stats for '{collection_name}': {str(e)}")
-        return {
-            "collection": collection_name,
-            "error": str(e),
-            "status": "ERROR"
-        }
-
+        return {"collection": collection_name, "error": str(e), "status": "ERROR"}
 
 # For testing
 if __name__ == "__main__":
     import sys
-    
     if len(sys.argv) < 2:
         print("Usage: python chroma.py <command> [args]")
         print("Commands:")
         print("  query <collection> [signature_id]")
         print("  semantic <collection> '<query>'")
         print("  stats <collection>")
-        print("\nExamples:")
-        print("  python chroma.py query all_logs 1000010")
-        print("  python chroma.py semantic all_threats 'SQL injection'")
-        print("  python chroma.py stats all_threats")
         sys.exit(1)
-    
+
     command = sys.argv[1]
-    
     if command == "semantic" and len(sys.argv) > 3:
         collection = sys.argv[2]
         query_text = " ".join(sys.argv[3:])

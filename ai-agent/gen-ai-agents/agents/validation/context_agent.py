@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import ollama
 import chromadb
+from pathlib import Path
 
 class ContextAgent:
     """
@@ -670,6 +671,75 @@ class ContextAgent:
 
         return min(1.0, confidence)
 
+    def _load_prompt_template(self, template_name: str) -> str:
+        """
+        Load prompt template from file.
+        
+        Args:
+            template_name: Name of the template file (e.g., 'context_analysis_prompt.md')
+        
+        Returns:
+            Prompt template string
+        """
+        try:
+            # ✅ FIX: Use absolute path to /app/prompts
+            prompt_path = Path("/app/prompts") / template_name
+            
+            if not prompt_path.exists():
+                logging.warning(f"Prompt template not found: {prompt_path}")
+                return self._get_default_context_prompt()
+            
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                template = f.read()
+            
+            if not template.strip():
+                logging.warning(f"Empty prompt template: {prompt_path}")
+                return self._get_default_context_prompt()
+            
+            logging.info(f"✅ Loaded prompt template: {template_name}")
+            return template
+            
+        except Exception as e:
+            logging.error(f"Error loading prompt template {template_name}: {e}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return self._get_default_context_prompt()
+
+
+    def _get_default_context_prompt(self) -> str:
+        """Fallback prompt template if file loading fails."""
+        return """You are a security analyst expert. Analyze this threat using the provided context.
+
+## CURRENT THREAT DETAILS
+{threat_details}
+
+## IP REPUTATION ANALYSIS
+{ip_reputation_summary}
+
+## SIMILAR THREATS ANALYSIS
+{similarity_analysis_summary}
+
+## CLASSIFICATION TASK
+Based on the above context, classify this threat as one of the following:
+
+1. **REAL_THREAT**: Confirmed malicious activity requiring immediate action
+2. **SUSPICIOUS**: Requires manual review, unclear intent
+3. **FALSE_POSITIVE**: Likely benign, can be filtered
+4. **BENIGN_ANOMALY**: Unusual but harmless activity
+
+## REQUIRED JSON OUTPUT FORMAT
+{{
+  "classification": "REAL_THREAT|SUSPICIOUS|FALSE_POSITIVE|BENIGN_ANOMALY",
+  "confidence": 0.85,
+  "reasoning": "Detailed explanation",
+  "recommendation": "escalate|review|filter",
+  "key_evidence": ["Evidence 1", "Evidence 2"]
+}}
+
+**Return ONLY valid JSON.**
+"""
+
+
     def _build_context_prompt(
         self,
         threat_data: Dict,
@@ -677,163 +747,146 @@ class ContextAgent:
     ) -> str:
         """
         Build structured prompt for LLM analysis using context data.
-
-        Formats all gathered context (IP history, reputation, similar threats)
-        into a comprehensive prompt for the LLM to make classification decisions.
-
-        Args:
-            threat_data (Dict): Current threat data containing:
-                - ip: Source IP address
-                - attack_type: Type of attack detected
-                - severity: Threat severity level
-                - description: Threat description
-                - timestamp: When threat occurred
-            context_summary (Dict): Aggregated context from analyze_context():
-                - ip_history: Result from _gather_ip_history()
-                - ip_reputation: Result from _analyze_ip_reputation()
-                - similar_threats: Result from _query_similar_threats()
-
-        Returns:
-            str: Formatted prompt ready for LLM input
         """
         try:
-            # Load prompt template
-            template_path = os.path.join(
-                os.path.dirname(__file__),
-                "prompts",
-                "context_analysis_prompt.md"
-            )
-
-            with open(template_path, "r") as f:
-                prompt_template = f.read()
-
             # Extract context data
             ip_history = context_summary.get("ip_history", {})
             ip_reputation = context_summary.get("ip_reputation", {})
             similar_threats = context_summary.get("similar_threats", {})
 
-            # Format IP reputation summary
+            # Format sections
+            threat_details = self._format_threat_details(threat_data)
             ip_reputation_summary = self._format_ip_reputation_summary(ip_reputation)
-
-            # Format risk factors
-            risk_factors = ip_reputation.get("risk_factors", [])
-            risk_factors_text = "\n".join([f"- {factor}" for factor in risk_factors]) if risk_factors else "- None identified"
-
-            # Format trust factors
-            trust_factors = ip_reputation.get("trust_factors", [])
-            trust_factors_text = "\n".join([f"- {factor}" for factor in trust_factors]) if trust_factors else "- None identified"
-
-            # Format similarity analysis
             similarity_analysis_summary = self._format_similarity_summary(similar_threats)
             similar_threats_details = self._format_similar_threats_details(similar_threats)
+            
+            risk_factors = self._format_list(ip_reputation.get('risk_factors', []))
+            trust_factors = self._format_list(ip_reputation.get('trust_factors', []))
 
-            # Fill in template variables
-            prompt = prompt_template.format(
-                # Current threat details
-                ip=threat_data.get("ip", "unknown"),
-                attack_type=threat_data.get("attack_type", "unknown"),
-                severity=threat_data.get("severity", "unknown"),
-                description=threat_data.get("description", "No description provided"),
-                timestamp=threat_data.get("timestamp", "unknown"),
+            # Build the actual prompt
+            prompt = f"""You are a security analyst expert. Analyze this threat using the provided context.
 
-                # IP reputation
-                ip_reputation_summary=ip_reputation_summary,
-                reputation_score=ip_reputation.get("reputation_score", 0.5),
-                reputation_category=ip_reputation.get("reputation_category", "neutral"),
-                ip_recommendation=ip_reputation.get("recommendation", "review"),
-                risk_factors=risk_factors_text,
-                trust_factors=trust_factors_text,
+## CURRENT THREAT DETAILS
+{threat_details}
 
-                # Similar threats
-                similarity_analysis_summary=similarity_analysis_summary,
-                pattern_summary=similar_threats.get("pattern_summary", "No pattern identified"),
-                similarity_confidence=similar_threats.get("confidence", 0.0),
-                similar_threats_details=similar_threats_details,
+## IP REPUTATION ANALYSIS
+{ip_reputation_summary}
 
-                # IP history
-                threat_count=ip_history.get("threat_count", 0),
-                is_novel_ip="Yes" if ip_history.get("novel_ip", True) else "No",
-                fp_rate=f"{ip_reputation.get('fp_rate', 0.0):.0%}",
-                has_fp_pattern="Yes" if ip_reputation.get("has_fp_pattern", False) else "No",
-                escalation_detected="Yes" if ip_reputation.get("escalation_detected", False) else "No"
-            )
+### Risk Factors
+{risk_factors}
 
+### Trust Factors
+{trust_factors}
+
+## SIMILAR THREATS ANALYSIS
+{similarity_analysis_summary}
+
+{similar_threats_details}
+
+## CLASSIFICATION TASK
+Based on the above context, classify this threat as one of the following:
+
+1. **REAL_THREAT**: Confirmed malicious activity requiring immediate action
+2. **SUSPICIOUS**: Requires manual review, unclear intent
+3. **FALSE_POSITIVE**: Likely benign, can be filtered
+4. **BENIGN_ANOMALY**: Unusual but harmless activity
+
+## REQUIRED JSON OUTPUT FORMAT
+Provide your response in the following JSON format:
+
+{{
+  "classification": "REAL_THREAT|SUSPICIOUS|FALSE_POSITIVE|BENIGN_ANOMALY",
+  "confidence": 0.85,
+  "reasoning": "Detailed explanation of your decision based on the context provided",
+  "recommendation": "escalate|review|filter",
+  "key_evidence": [
+    "Evidence point 1",
+    "Evidence point 2"
+  ]
+}}
+
+**Important**: Return ONLY valid JSON. No additional text before or after the JSON block.
+"""
             return prompt
 
         except Exception as e:
             logging.error(f"Error building context prompt: {str(e)}")
-            # Return minimal prompt on error
+            import traceback
+            logging.error(traceback.format_exc())
             return self._build_fallback_prompt(threat_data)
 
+    # ✅ ADDING MISSING HELPER METHODS
+    def _format_threat_details(self, threat_data: Dict) -> str:
+        """Format threat details section."""
+        return f"""- **IP Address**: {threat_data.get('ip', 'unknown')}
+- **Attack Type**: {threat_data.get('attack_type', 'unknown')}
+- **Severity**: {threat_data.get('severity', 'unknown')}
+- **Total Events**: {threat_data.get('total_events', 0)}
+- **Timestamp**: {threat_data.get('timestamp', 'unknown')}"""
+
     def _format_ip_reputation_summary(self, ip_reputation: Dict) -> str:
-        """Format IP reputation data into readable summary."""
+        """Format IP reputation analysis into human-readable text."""
         if not ip_reputation:
             return "No IP reputation data available."
-
-        is_novel = ip_reputation.get("is_novel_ip", True)
-        if is_novel:
-            return "This is a novel IP with no historical data in our system."
-
-        score = ip_reputation.get("reputation_score", 0.5)
-        category = ip_reputation.get("reputation_category", "neutral")
-        confidence = ip_reputation.get("confidence", 0.0)
-
-        return f"IP has a reputation score of {score:.2f} (category: {category}) with {confidence:.0%} confidence based on historical data."
+        
+        return f"""- **Reputation Score**: {ip_reputation.get('reputation_score', 0.5):.2f} / 1.0
+- **Reputation Category**: {ip_reputation.get('reputation_category', 'neutral')}
+- **Recommendation**: {ip_reputation.get('recommendation', 'review')}
+- **Historical Threat Count**: {ip_reputation.get('threat_count', 0)}
+- **Novel IP**: {"Yes" if ip_reputation.get('is_novel_ip', True) else "No"}
+- **False Positive Rate**: {ip_reputation.get('fp_rate', 0.0):.0%}
+- **Escalation Detected**: {"Yes" if ip_reputation.get('escalation_detected', False) else "No"}"""
 
     def _format_similarity_summary(self, similar_threats: Dict) -> str:
-        """Format similar threats analysis into readable summary."""
-        if not similar_threats or not similar_threats.get("similar_threats"):
-            return "No similar threats found in historical data."
-
-        threat_count = len(similar_threats.get("similar_threats", []))
-        confidence = similar_threats.get("confidence", 0.0)
-        has_similar_fps = similar_threats.get("has_similar_fps", False)
-        has_similar_threats = similar_threats.get("has_similar_threats", False)
-
-        summary = f"Found {threat_count} similar threats with {confidence:.0%} confidence. "
-
-        if has_similar_fps and has_similar_threats:
-            summary += "Mixed pattern: both false positives and real threats detected."
-        elif has_similar_fps:
-            summary += "Pattern suggests false positive (multiple similar FPs found)."
-        elif has_similar_threats:
-            summary += "Pattern suggests real threat (multiple similar real threats found)."
-        else:
-            summary += "Insufficient pattern to determine classification."
-
-        return summary
+        """Format similar threats analysis into human-readable text."""
+        if not similar_threats:
+            return "No similar threat data available."
+        
+        confidence = similar_threats.get('confidence', 0.0)
+        pattern = similar_threats.get('pattern_summary', 'No pattern identified')
+        
+        return f"""- **Pattern Summary**: {pattern}
+- **Similarity Confidence**: {confidence:.0%}
+- **Similar False Positives Found**: {"Yes" if similar_threats.get('has_similar_fps', False) else "No"}
+- **Similar Real Threats Found**: {"Yes" if similar_threats.get('has_similar_threats', False) else "No"}"""
 
     def _format_similar_threats_details(self, similar_threats: Dict) -> str:
-        """Format detailed list of similar threats."""
-        if not similar_threats or not similar_threats.get("similar_threats"):
-            return "No similar threats to display."
+        """Format detailed information about similar threats."""
+        threats = similar_threats.get('similar_threats', [])
+        if not threats:
+            return ""
+        
+        lines = ["### Similar Threat Examples:"]
+        for i, threat in enumerate(threats[:3], 1):
+            ip = threat.get('ip', 'unknown')
+            attack = threat.get('attack_type', 'unknown')
+            severity = threat.get('severity', 'unknown')
+            lines.append(f"{i}. IP: {ip} | Attack: {attack} | Severity: {severity}")
+        
+        return "\n".join(lines)
 
-        threats_list = similar_threats.get("similar_threats", [])
-        scores = similar_threats.get("similarity_scores", [])
-
-        details = "**Top Similar Threats:**\n\n"
-        for i, (threat, score) in enumerate(zip(threats_list[:5], scores[:5]), 1):
-            ip = threat.get("ip", "unknown")
-            attack_type = threat.get("attack_type", "unknown")
-            classification = threat.get("classification", "unknown")
-            severity = threat.get("severity", "unknown")
-
-            details += f"{i}. IP: {ip} | Attack: {attack_type} | Classification: {classification} | "
-            details += f"Severity: {severity} | Similarity: {score:.0%}\n"
-
-        return details
+    def _format_list(self, items: list) -> str:
+        """Format list items with bullets."""
+        if not items:
+            return "- None identified"
+        return "\n".join([f"- {item}" for item in items])
 
     def _build_fallback_prompt(self, threat_data: Dict) -> str:
-        """Build minimal prompt when template loading fails."""
+        """Build minimal prompt when context gathering fails."""
         return f"""Analyze this security threat:
 
 IP: {threat_data.get('ip', 'unknown')}
 Attack Type: {threat_data.get('attack_type', 'unknown')}
 Severity: {threat_data.get('severity', 'unknown')}
-Description: {threat_data.get('description', 'No description')}
+Total Events: {threat_data.get('total_events', 0)}
 
-Classify as: REAL_THREAT, SUSPICIOUS, FALSE_POSITIVE, or BENIGN_ANOMALY
-
-Provide response in JSON format with classification, confidence, and reasoning.
+Return ONLY this JSON format (no other text):
+{{
+  "classification": "SUSPICIOUS",
+  "confidence": 0.5,
+  "reasoning": "Fallback analysis due to context gathering error",
+  "recommendation": "review",
+  "key_evidence": ["Unable to gather full context"]
+}}
 """
 

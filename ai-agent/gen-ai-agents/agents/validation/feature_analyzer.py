@@ -6,7 +6,7 @@ before sending anomalies to the LLM validator. Analyzes timing patterns,
 traffic patterns, IP reputation, and rule violations.
 """
 
-from datetime import time, datetime
+from datetime import time, datetime, timezone
 from typing import Dict, List, Optional, Tuple, Any
 from ipaddress import ip_network, IPv4Address
 import ipaddress
@@ -177,21 +177,13 @@ class FeatureAnalyzer:
                 for match in matches:
                     # Extract timestamp (try multiple fields)
                     timestamp = None
-                    timestamp_fields = ["@timestamp", "suricata_timestamp", "timestamp"]
-                    
+                    timestamp_fields = ["@timestamp", "suricata_timestamp", "timestamp", "event_time", "time"]
                     for field in timestamp_fields:
-                        if field in match:
-                            try:
-                                # Parse ISO format timestamp
-                                timestamp_str = match[field]
-                                timestamp = datetime.fromisoformat(
-                                    timestamp_str.replace('Z', '+00:00')
-                                )
-                                threat_data["timestamps"].append(timestamp)
+                        if field in match and match[field] is not None:
+                            ts_parsed = _parse_ts(match[field])
+                            if ts_parsed:
+                                threat_data["timestamps"].append(ts_parsed)
                                 break
-                            except (ValueError, AttributeError):
-                                continue
-                    
                     # Extract source IP
                     if "src_ip" in match:
                         src_ip = match["src_ip"]
@@ -249,7 +241,13 @@ class FeatureAnalyzer:
                 "flags": List[str]  # List of timing pattern flags
             }
         """
-        timestamps = threat.get("timestamps", [])
+        # Normalize timestamps to datetime and drop invalid entries
+        raw_ts = threat.get("timestamps", [])
+        timestamps = []
+        for ts in raw_ts:
+            dt = _parse_ts(ts)
+            if isinstance(dt, datetime):
+                timestamps.append(dt)
         original_count = len(timestamps)
         
         # Initialize result structure
@@ -269,24 +267,6 @@ class FeatureAnalyzer:
         # If no timestamps, can't analyze timing
         if not timestamps:
             result["flags"].append("no_timestamps")
-            return result
-        
-        # Convert all timestamps to datetime objects if they're strings
-        converted_timestamps = []
-        for ts in timestamps:
-            if isinstance(ts, str):
-                try:
-                    # Parse ISO format timestamp
-                    ts = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-                except (ValueError, AttributeError) as e:
-                    # Skip invalid timestamps
-                    continue
-            converted_timestamps.append(ts)
-        
-        timestamps = converted_timestamps
-        
-        if not timestamps:
-            result["flags"].append("no_valid_timestamps")
             return result
         
         # Get earliest and latest timestamps (required before sampling)
@@ -319,12 +299,8 @@ class FeatureAnalyzer:
         processed_count = 0
         
         for i, ts in enumerate(timestamps, 1):
-            # Extract time component - ts is now guaranteed to be a datetime object
-            if isinstance(ts, datetime):
-                time_of_day = ts.time()  # ✅ NOW SAFE - ts is a datetime object
-            else:
-                # Skip if still not a datetime object
-                continue
+            # Extract time component
+            time_of_day = ts.time()
             
             # Check if within business hours
             # Handle case where business hours cross midnight (e.g., 22:00 to 02:00)
@@ -876,3 +852,92 @@ class FeatureAnalyzer:
                   f"FeatureAnalyzer: {result['feature_analyzer_confidence_score']:.2f}) - {result['reasoning']}")
         
         return result
+
+def _parse_ts(ts: Any) -> Optional[datetime]:
+    """Parse various timestamp formats into a timezone-aware datetime where possible."""
+    if isinstance(ts, datetime):
+        return ts
+    if isinstance(ts, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(ts), tz=timezone.utc)
+        except Exception:
+            return None
+    if isinstance(ts, str):
+        s = ts.strip()
+        # Try ISO with/without fractional seconds and Z/offset
+        fmts = [
+            "%Y-%m-%dT%H:%M:%S.%fZ",
+            "%Y-%m-%dT%H:%M:%SZ",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S.%f%z",
+            "%Y-%m-%dT%H:%M:%S%z",
+        ]
+        s_z = s.replace("Z", "+0000")
+        for fmt in fmts:
+            try:
+                return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+            except ValueError:
+                try:
+                    return datetime.strptime(s_z, fmt)
+                except ValueError:
+                    pass
+        try:
+            return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    return None
+
+def _to_int(val: Any, default: int = 0) -> int:
+    try:
+        if isinstance(val, bool):
+            return int(val)
+        if isinstance(val, (int, float)):
+            return int(val)
+        if isinstance(val, str) and val.strip().isdigit():
+            return int(val.strip())
+        return default
+    except Exception:
+        return default
+
+def _to_float(val: Any, default: float = 0.0) -> float:
+    try:
+        if isinstance(val, (int, float)):
+            return float(val)
+        if isinstance(val, str):
+            return float(val.strip())
+        return default
+    except Exception:
+        return default
+
+# In rate/burst calculations (e.g., _check_timing_patterns), ensure arithmetic uses datetimes:
+def _check_timing_patterns(self, threat: Dict) -> Dict[str, Any]:
+    timestamps = []
+    for ts in threat.get("timestamps", []):
+        dt = _parse_ts(ts)
+        if isinstance(dt, datetime):
+            timestamps.append(dt)
+    timestamps.sort()
+    metrics = {"has_burst": False, "avg_interval_sec": None, "window_rate_per_min": None}
+    if len(timestamps) >= 2:
+        # Compute average interval
+        diffs = []
+        for a, b in zip(timestamps, timestamps[1:]):
+            diffs.append((b - a).total_seconds())
+        if diffs:
+            metrics["avg_interval_sec"] = sum(diffs) / len(diffs)
+        # Compute simple window rate over first-to-last
+        span_sec = (timestamps[-1] - timestamps[0]).total_seconds()
+        if span_sec > 0:
+            metrics["window_rate_per_min"] = (len(timestamps) / span_sec) * 60.0
+        # Burst if any interval < threshold (e.g., < 1s) or rate exceeds threshold
+        metrics["has_burst"] = any(d < 1.0 for d in diffs) or (metrics["window_rate_per_min"] or 0) > 120.0
+    return metrics
+
+# Wherever counts/ports are used, normalize:
+def _normalize_event_fields(self, match: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "dst_port": _to_int(match.get("dest_port") or match.get("dst_port")),
+        "src_port": _to_int(match.get("src_port")),
+        "bytes": _to_int(match.get("bytes")),
+        "pkts": _to_int(match.get("pkts")),
+    }

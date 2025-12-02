@@ -74,7 +74,7 @@ def print_analysis_box(title, content_lines, color=Colors.GREEN):
 
 port = os.getenv("OLLAMA_PORT", "11434")
 llm = ChatOllama(
-    model="qwen2.5:32b",
+    model="gpt-oss:20b",
     base_url=f"http://ollama:{port}",
     temperature=0,
     num_ctx=8192,
@@ -101,39 +101,73 @@ def extract_threat_from_validation_result(validation_result: dict) -> dict:
     Extract threat data from validation orchestrator result format.
     
     Args:
-        validation_result: Dict with 'threat', 'analysis', 'llm_validation' keys
+        validation_result: Dict with validation results
     
     Returns:
         Normalized threat dict for analysis
     """
-    threat_data = validation_result.get("threat", {})
-    analysis = validation_result.get("analysis", {})
-    llm_validation = validation_result.get("llm_validation", {})
+    # ✅ Extract from different possible structures
+    threat_data = validation_result.get("threat_data", {})
+    
+    # Fallback: if validation_result IS the threat
+    if not threat_data and "ip" in validation_result:
+        threat_data = validation_result
     
     # Extract key fields
     ip = threat_data.get("ip", "unknown")
+    
+    # ✅ DETERMINE ATTACK TYPE FROM RULES VIOLATED
     attack_type = threat_data.get("attack_type", "unknown")
+    
+    # If attack_type is unknown, infer from rules_violated
+    if attack_type == "unknown":
+        rules_violated = threat_data.get("rules_violated", [])
+        if rules_violated:
+            # Use first rule's description as attack type
+            first_rule = rules_violated[0]
+            if isinstance(first_rule, dict):
+                attack_type = first_rule.get("rule_id", "unknown")
+                # Clean up rule_id for better clustering
+                attack_type = attack_type.replace("_", " ").title()
+    
+    # ✅ INFER FROM SIGNATURE OR CATEGORY
+    if attack_type == "unknown":
+        # Check for signature field
+        signature = threat_data.get("signature", "")
+        if signature:
+            attack_type = signature
+    
+    # ✅ INFER FROM PORTS (reconnaissance patterns)
+    if attack_type == "unknown":
+        ports = threat_data.get("ports", [])
+        if len(ports) > 5:
+            attack_type = "Port Scanning / Reconnaissance"
+        elif ports:
+            # Map common ports to attack types
+            port_map = {
+                80: "HTTP Attack",
+                443: "HTTPS Attack",
+                22: "SSH Attack",
+                21: "FTP Attack",
+                3306: "MySQL Attack",
+                1433: "MSSQL Attack",
+                3389: "RDP Attack"
+            }
+            for port in ports:
+                if port in port_map:
+                    attack_type = port_map[port]
+                    break
+    
     severity = threat_data.get("severity", "LOW")
     total_events = threat_data.get("total_events", 0)
     
-    # Get classification info
-    fa_classification = analysis.get("classification", "UNKNOWN")
-    llm_decision = llm_validation.get("decision", "UNKNOWN")
-    
-    # Extract IPs and ports
-    src_ips = threat_data.get("src_ips", [ip])
-    dest_ips = threat_data.get("dest_ips", [])
-    ports = threat_data.get("ports", [])
-    
-    # Extract signature IDs from rules violated
-    signature_ids = []
-    for rule in threat_data.get("rules_violated", []):
-        if "rule_id" in rule:
-            signature_ids.append(str(rule["rule_id"]))
+    # Get classification from validation
+    classification = validation_result.get("classification", "UNKNOWN")
+    confidence = validation_result.get("confidence", 0.5)
     
     # Determine if this should be analyzed
-    proceed_to_analysis = llm_validation.get("proceed_to_analysis", True)
-    if fa_classification == "FALSE_POSITIVE":
+    proceed_to_analysis = True
+    if classification in ["FALSE_POSITIVE", "BENIGN_ANOMALY"]:
         proceed_to_analysis = False
     
     return {
@@ -141,19 +175,17 @@ def extract_threat_from_validation_result(validation_result: dict) -> dict:
         "attack_type": attack_type,
         "severity": severity,
         "total_events": total_events,
-        "classification": fa_classification,
-        "llm_decision": llm_decision,
+        "classification": classification,
+        "confidence": confidence,
         "proceed_to_analysis": proceed_to_analysis,
-        "src_ips": src_ips,
-        "dest_ips": dest_ips,
-        "ports": ports,
-        "signature_ids": signature_ids,
+        "src_ips": threat_data.get("src_ips", [ip]),
+        "dest_ips": threat_data.get("dest_ips", []),
+        "ports": threat_data.get("ports", []),
+        "signature_ids": [str(r.get("rule_id", "")) for r in threat_data.get("rules_violated", [])],
         "rules_violated": threat_data.get("rules_violated", []),
         "confidence_score": threat_data.get("confidence_score", 0.5),
         "timestamps": threat_data.get("timestamps", []),
-        "heuristic_flags": analysis.get("heuristic_flags", []),
-        "llm_reasoning": llm_validation.get("reasoning", ""),
-        "validation_result": validation_result  # Keep original for reference
+        "validation_result": validation_result
     }
 
 
@@ -173,7 +205,6 @@ def analyze_all_threats_batch(validated_results, max_retries=20):
     print(f"{Colors.BOLD}{Colors.GREEN}█  🎯 HIERARCHICAL THREAT ANALYSIS STARTED{' ' * (35)}{Colors.ENDC}{Colors.GREEN}█{Colors.ENDC}{Colors.BOLD}")
     print(f"{Colors.GREEN}{'█' * 80}{Colors.ENDC}\n")
     
-    # Extract threats from validation results
     all_threats = []
     for result in validated_results:
         threat = extract_threat_from_validation_result(result)
@@ -239,8 +270,22 @@ def cluster_threats_by_pattern(all_threats):
         # Normalize attack type for better clustering
         attack_type_normalized = attack_type.lower().strip().replace(" ", "_")
         
-        # Cluster key: IP + primary attack type
+        # ✅ CREATE SEPARATE CLUSTERS FOR EACH IP (even if attack_type is same)
+        # This prevents all "unknown" threats from clustering together
         cluster_key = f"{ip}_{attack_type_normalized}"
+        
+        # ✅ FALLBACK: If IP is unknown, cluster by ports and severity
+        if ip == "unknown":
+            ports = threat.get("ports", [])
+            severity = threat.get("severity", "LOW")
+            
+            if ports:
+                # Use first port as differentiator
+                cluster_key = f"unknown_port_{ports[0]}_{attack_type_normalized}"
+            else:
+                # Use severity as differentiator
+                cluster_key = f"unknown_{severity}_{attack_type_normalized}"
+        
         clusters[cluster_key].append(threat)
     
     # Sort by cluster size (largest first)
@@ -267,8 +312,10 @@ def cluster_threats_by_pattern(all_threats):
     # Show top 5 clusters
     top_clusters = []
     for idx, (key, threats) in enumerate(list(sorted_clusters.items())[:5]):
-        ip, attack = key.split("_", 1)
-        top_clusters.append(f"   {idx+1}. {ip} - {attack}: {len(threats)} threats")
+        parts = key.split("_", 1)
+        ip = parts[0] if parts else "unknown"
+        attack = parts[1] if len(parts) > 1 else "unknown"
+        top_clusters.append(f"   {idx+1}. {ip} - {attack.replace('_', ' ')}: {len(threats)} threats")
     
     print_analysis_box("🔝 TOP 5 CLUSTERS", top_clusters, Colors.YELLOW)
     
@@ -304,7 +351,8 @@ def investigate_cluster(cluster_key, cluster_threats, max_tools=3):
         "total_events": total_events,
         "severity": max_severity,
         "signature_ids": list(all_signature_ids),
-        "tool_findings": []
+        "tool_findings": [],
+        "citations": []  # <-- collect sources here
     }
     
     findings = [
@@ -317,46 +365,92 @@ def investigate_cluster(cluster_key, cluster_threats, max_tools=3):
     # Tool 1: Check historical data for this IP
     try:
         chroma_result = query_chroma(f"all_threats {ip}")
-        finding = {
+        investigation["tool_findings"].append({
             "tool": "ChromaQuery",
             "query": f"IP {ip}",
             "result": chroma_result[:500] if chroma_result else "No historical data found"
-        }
-        investigation["tool_findings"].append(finding)
+        })
+        # Try to parse and add citations
+        try:
+            data = json.loads(chroma_result)
+            for r in (data.get("results") or []):
+                meta = r.get("metadata") or {}
+                investigation["citations"].append({
+                    "type": "RAG",
+                    "collection": "all_threats",
+                    "id": r.get("id"),
+                    "source": meta.get("source") or meta.get("doc") or "unknown",
+                    "title": meta.get("title") or meta.get("rule") or "entry",
+                    "similarity": meta.get("similarity_score")
+                })
+        except Exception:
+            pass
         findings.append(f"🔧 Tool 1 (ChromaQuery): ✓ Success")
-    except Exception as e:
+    except Exception:
         findings.append(f"🔧 Tool 1 (ChromaQuery): ✗ Failed")
-    
-    # Tool 2: Semantic search for similar attacks (only for significant clusters)
+
+    # Tool 2: Semantic search (RAG citations)
     if len(cluster_threats) >= 1 or total_events > 10:
         try:
             semantic_result = query_chroma_semantic(
-                f"{attack_type.replace('_', ' ')} attack pattern", 
-                collection_name="attack_mitigation_knowledge", 
+                f"{attack_type.replace('_', ' ')} attack pattern",
+                collection_name="attack_mitigation_knowledge",
                 top_k=3
             )
-            finding = {
+            investigation["tool_findings"].append({
                 "tool": "SemanticSearch",
                 "query": attack_type.replace("_", " "),
                 "result": semantic_result[:500] if semantic_result else "No similar patterns found"
-            }
-            investigation["tool_findings"].append(finding)
+            })
+            # Parse and add citations
+            try:
+                sdata = json.loads(semantic_result)
+                for r in (sdata.get("results") or []):
+                    investigation["citations"].append({
+                        "type": "RAG",
+                        "collection": sdata.get("collection"),
+                        "id": r.get("id"),
+                        "source": r.get("metadata", {}).get("source") or "mitre_pdf_chunk",
+                        "title": r.get("metadata", {}).get("title") or "attack_mitigation_knowledge",
+                        "similarity": r.get("similarity_score")
+                    })
+            except Exception:
+                pass
             findings.append(f"🔧 Tool 2 (SemanticSearch): ✓ Success")
-        except Exception as e:
+        except Exception:
             findings.append(f"🔧 Tool 2 (SemanticSearch): ✗ Failed")
-    
-    # Tool 3: Web research (only for top clusters)
+
+    # Tool 3: Web research (web citations)
     if total_events > 50 or max_severity >= 3:
         try:
             web_result = websearch(f"{attack_type.replace('_', ' ')} CVE mitigation strategies")
-            finding = {
+            investigation["tool_findings"].append({
                 "tool": "WebSearch",
                 "query": f"{attack_type.replace('_', ' ')} mitigation",
                 "result": web_result[:500] if web_result else "No CVE data found"
-            }
-            investigation["tool_findings"].append(finding)
+            })
+            # If websearch returns JSON, extract URL/title
+            try:
+                w = json.loads(web_result)
+                # support list or dict formats
+                items = w if isinstance(w, list) else w.get("results") or []
+                for item in items[:3]:
+                    investigation["citations"].append({
+                        "type": "WEB",
+                        "url": item.get("url") or item.get("link") or item.get("source"),
+                        "title": item.get("title") or "web result",
+                        "snippet": item.get("snippet") or item.get("summary")
+                    })
+            except Exception:
+                # fallback: treat as plain string, no URL
+                investigation["citations"].append({
+                    "type": "WEB",
+                    "url": None,
+                    "title": "websearch",
+                    "snippet": web_result[:200] if isinstance(web_result, str) else ""
+                })
             findings.append(f"🔧 Tool 3 (WebSearch): ✓ Success")
-        except Exception as e:
+        except Exception:
             findings.append(f"🔧 Tool 3 (WebSearch): ✗ Failed")
     
     print_info_box(findings, Colors.BLUE)
@@ -547,6 +641,17 @@ CRITICAL: Output MUST be valid JSON starting with {{ and ending with }}. No mark
         if missing_fields:
             if 'attack_timeline' not in final_json:
                 final_json['attack_timeline'] = f"Attack campaign spanning {total_threats} events from {len(unique_ips)} sources"
+        
+        # Aggregate citations across clusters
+        citations = []
+        for analysis in cluster_analyses:
+            for c in analysis.get("citations", []):
+                citations.append(c)
+
+        final_json["sources"] = {
+            "rag": [c for c in citations if c.get("type") == "RAG"][:20],
+            "web": [c for c in citations if c.get("type") == "WEB"][:20]
+        }
         
         print_info_box([f"✅ LLM synthesis successful"], Colors.GREEN)
         return final_json

@@ -1,0 +1,246 @@
+{
+  "executive_summary": "The cluster analysis reveals a concentrated threat landscape dominated by a single IP (198.51.100.25) that has executed multiple high\u2011severity attack patterns, including reconnaissance, a Suricata alert storm, and suspicious source IP activity. Two additional IPs (203.0.113.10 and 185.220.101.32) exhibit lower\u2011severity suspicious activity. Overall, five distinct threat events were identified across three unique attackers, with a high severity distribution of three high\u2011severity incidents and two low\u2011severity incidents.",
+  "threat_statistics": {
+    "total_threats": 5,
+    "unique_attackers": 3,
+    "attack_categories": [
+      "reconnaissance / scanning",
+      "suspicious activity",
+      "suricata alert storm",
+      "suspicious src ip"
+    ],
+    "severity_breakdown": {
+      "HIGH": 3,
+      "LOW": 2
+    },
+    "clusters_analyzed": 5
+  },
+  "key_findings": [
+    "Finding 1: The IP 198.51.100.25 appears in three separate clusters (reconnaissance, Suricata alert storm, and suspicious src ip) indicating a persistent threat actor with multi\u2011stage tactics.",
+    "Finding 2: All threat searches against the all_threats collection returned no results, yet the attack_mitigation_knowledge queries returned relevant mitigation content, confirming the presence of known attack patterns but no prior detection signatures in the system."
+  ],
+  "threat_actors": [
+    {
+      "ip": "198.51.100.25",
+      "attack_types": [
+        "reconnaissance / scanning",
+        "suricata alert storm",
+        "suspicious src ip"
+      ],
+      "threat_count": 3,
+      "sophistication": "HIGH",
+      "threat_level": "HIGH"
+    },
+    {
+      "ip": "203.0.113.10",
+      "attack_types": [
+        "suspicious activity"
+      ],
+      "threat_count": 1,
+      "sophistication": "LOW",
+      "threat_level": "LOW"
+    },
+    {
+      "ip": "185.220.101.32",
+      "attack_types": [
+        "suspicious activity"
+      ],
+      "threat_count": 1,
+      "sophistication": "LOW",
+      "threat_level": "LOW"
+    }
+  ],
+  "attack_timeline": "The attack sequence began with reconnaissance scanning from 198.51.100.25, followed by a Suricata alert storm indicating exploitation attempts. Concurrently, 203.0.113.10 and 185.220.101.32 generated suspicious activity events. The final phase involved 198.51.100.25 sending traffic from a suspicious source IP, suggesting potential lateral movement or spoofing.",
+  "iocs": {
+    "malicious_ips": [
+      "203.0.113.10",
+      "198.51.100.25",
+      "185.220.101.32"
+    ],
+    "signature_ids": [
+      "suricata_alert_storm",
+      "suspicious_src_ip"
+    ],
+    "attack_patterns": [
+      "reconnaissance / scanning",
+      "suspicious activity",
+      "suricata alert storm",
+      "suspicious src ip"
+    ]
+  },
+  "immediate_actions": [
+    "Block traffic from 198.51.100.25, 203.0.113.10, and 185.220.101.32 at the perimeter firewall.",
+    "Deploy Suricata signatures for the identified alert storm patterns and update IDS rules for suspicious source IP detection.",
+    "Enable deep packet inspection for traffic from 198.51.100.25 to detect potential exploitation attempts.",
+    "Conduct a rapid vulnerability scan of all exposed services to identify any unpatched CVEs referenced in the alert storm.",
+    "Notify incident response team to monitor for lateral movement indicators."
+  ],
+  "strategic_recommendations": [
+    "Implement continuous threat hunting to detect similar multi\u2011stage attack patterns early.",
+    "Enhance logging and correlation across IDS, firewall, and endpoint agents to improve visibility.",
+    "Patch all systems promptly, especially those vulnerable to CVE\u20112025\u201129918 and CVE\u20112025\u201154309.",
+    "Establish an automated alerting workflow for high\u2011severity Suricata events.",
+    "Conduct regular tabletop exercises to test response to reconnaissance and alert storm scenarios."
+  ],
+  "risk_assessment": {
+    "overall_risk": "HIGH",
+    "confidence": 0.9,
+    "reasoning": "The presence of a single IP executing multiple high\u2011severity attack patterns, coupled with the lack of prior detection signatures, indicates a sophisticated threat actor with a high likelihood of successful exploitation."
+  },
+  "sources": {
+    "rag": [
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_001195",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.057
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002585",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.041
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002556",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.033
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002557",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.035
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002576",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.018
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002587",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.012
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002557",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.035
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002576",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.018
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002587",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": 0.012
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002591",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": -0.115
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002540",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": -0.171
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002534",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": -0.183
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "mitigation_http_syn_scan",
+        "source": "mitre_pdf_chunk",
+        "title": "attack_mitigation_knowledge",
+        "similarity": -0.032
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_002102",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": -0.177
+      },
+      {
+        "type": "RAG",
+        "collection": "attack_mitigation_knowledge",
+        "id": "training_chunk_001465",
+        "source": "training_pdfs",
+        "title": "attack_mitigation_knowledge",
+        "similarity": -0.202
+      }
+    ],
+    "web": [
+      {
+        "type": "WEB",
+        "url": null,
+        "title": "websearch",
+        "snippet": "Result 1:\n- How to scan for critical CVE weaknesses - LabEx\n  This comprehensive tutorial provides professionals and security enthusiasts with a systematic approach to scanning and analyzing Common Vu"
+      },
+      {
+        "type": "WEB",
+        "url": null,
+        "title": "websearch",
+        "snippet": "Result 1:\n- Understanding and Mitigating Critical CVEs: A Red and Blue Team ...\n  This blog will explore 10 CVEs that have significantly impacted various industries, providing insights from both the b"
+      },
+      {
+        "type": "WEB",
+        "url": null,
+        "title": "websearch",
+        "snippet": "Result 1:\n- Understanding and Mitigating Critical CVEs: A Red and Blue Team ...\n  This blog will explore 10 CVEs that have significantly impacted various industries, providing insights from both the b"
+      },
+      {
+        "type": "WEB",
+        "url": null,
+        "title": "websearch",
+        "snippet": "Result 1:\n- CVE-2025-29918 Impact, Exploitability, and Mitigation Steps | Wiz\n  PricingGet a demo Get a demo Vulnerability DatabaseCVE-2025-29918 # CVE-2025-29918:\u00a0 Suricata\u00a0vulnerability analysis and"
+      },
+      {
+        "type": "WEB",
+        "url": null,
+        "title": "websearch",
+        "snippet": "Result 1:\n- CVE-2025-54309 Impact, Exploitability, and Mitigation Steps\n  Additional recommended mitigation steps include implementing IP whitelisting for server and admin access, enabling automatic u"
+      }
+    ]
+  }
+}

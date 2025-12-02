@@ -27,18 +27,16 @@ services:
       - ./agents/analyst-agent/email_agent.py:/app/email_agent.py
       - ./agents/tools/websearch.py:/app/websearch.py
       - ./agents/validation/feature_analyzer.py:/app/feature_analyzer.py
-      - ./agents/validation/llm_validator.py:/app/llm_validator.py
+      - ./agents/validation/validating_prompt.py:/app/validating_prompt.py
+      - ./agents/validation/context_agent.py:/app/context_agent.py
       - ./agents/validation/validation_orchestrator.py:/app/validation_orchestrator.py
-      - ./pip-cache:/root/.cache/pip
-      - ./output:/app/output
+      - ./prompts:/app/prompts
+      - ./pip-cache:/tmp/pip-cache
+      - ../output:/app/output
+      - ./training_data:/app/training_data
     environment:
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_USER=myuser
-      - POSTGRES_PASSWORD=mypassword
-      - POSTGRES_DB=alertsdb
       - OLLAMA_PORT=11434
       - OLLAMA_HOST=ollama
       - OLLAMA_MODEL=llama3.1:8b
@@ -51,25 +49,10 @@ services:
       - TAVILY_API_KEY=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
     working_dir: /app
     command: >
-      bash -c "
-        set -e &&
-        pip install chromadb psycopg2-binary langchain langchain-ollama requests ollama sentence-transformers &&
-        python /app/chroma_setup.py &&
-        python /app/postgres_setup.py &&
-        python /app/main.py
-      "
-  postgres:
-    image: postgres:16
-    container_name: postgres
-    environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
-      POSTGRES_DB: alertsdb
-    ports:
-      - "1562:5432"
-    volumes:
-      - ./pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
+      bash -c "mkdir -p /tmp/pip-cache &&
+               chown -R root:root /tmp/pip-cache &&
+               pip install --cache-dir=/tmp/pip-cache chromadb psycopg2-binary langchain langchain-ollama requests ollama sentence-transformers PyPDF2 &&
+               python main.py"
 
   ollama:
     image: ollama/ollama:latest
@@ -77,7 +60,7 @@ services:
     ports:
       - "1561:11434"
     volumes:
-      - ./ollama-data:/root/.ollama
+      - ../ollama/ollama-data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
     restart: unless-stopped
