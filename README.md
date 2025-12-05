@@ -50,10 +50,87 @@ The **Suricata** intrusion detection system (IDS) monitors traffic across these 
 - These exports provide reproducible evidence of detection across multiple attack categories.  
 - Runtime logs are excluded from version control through `.gitignore` to maintain a clean repository.
 
+### AI Agent System
+
+The `ai-agent/` directory contains an AI-driven security analysis pipeline that processes Suricata alerts, validates threats, and generates actionable reports.
+
+### Architecture
+
+```
+ai-agent/gen-ai-agents/
+├── agents/
+│   ├── analyst-agent/     # LLM-based threat analysis
+│   ├── validation/        # Feature analyzer + context agent
+│   └── tools/             # ChromaDB, web search, relevance scoring
+├── python-files/
+│   ├── main.py            # Pipeline orchestrator
+│   └── chroma_setup.py    # Vector DB initialization
+├── logs/
+│   ├── demo.json          # Input: correlated threats
+│   └── validated_threats.json  # Output: validated results
+└── compose.yml            # Docker services
+```
+
+### Pipeline Stages
+
+| Stage | Description |
+|-------|-------------|
+| **0. Validation** | FeatureAnalyzer + ContextAgent classify threats as REAL_THREAT, SUSPICIOUS, or FALSE_POSITIVE |
+| **1. Preprocessing** | Load and normalize validated threats |
+| **2. Clustering** | Group threats by IP, aggregate signatures and severity |
+| **3. Analyst Review** | LLM-based deep analysis with ChromaDB and web search tools |
+| **4. Output** | Save final report to `output/final_report.json` |
+
+### Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| **chroma** | 1563 | Vector database for MITRE mappings and logs |
+| **ollama** | 1561 | LLM inference (llama3.1:8b) |
+| **agent** | — | Pipeline orchestrator |
+
+### Running the AI Agent
+
+1. **Navigate to the agent directory:**
+   ```bash
+   cd ai-agent/gen-ai-agents
+
+   docker compose up --build
+
+   cat output/final_report.json
+   ```
+
+### Running Individual Stages
+
+- You cannot run analysis without validation.
+- The log file must have the logs given out by the Isolation Forest from this project.
+
+```bash
+# Start dependencies only
+docker compose up -d chroma ollama
+
+# Run validation only
+docker compose run agent python /app/agents/validation/validation_orchestrator.py
+
+# Run full pipeline
+docker compose run agent python /app/main.py
+```
+
+### Configuration
+
+Set these environment variables in `compose.yml` or `.env`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RAW_LOG_LOCATION` | `/app/logs/demo.json` | The logs should be in exact format as Isolation forest outputs |
+| `VALIDATED_LOG_LOCATION` | `/app/logs/validated_threats.json` | Validated output |
+| `OUTPUT_DIR` | `/app/output` | Final report directory |
+
 
 ## Repository Structure
 ```
 ai-sec-monitor/
+├─ ai-agent/				 # Gen-AI agents for analyzing logs
 ├─ docs/                     # Documentation
 ├─ infra/                    # Docker and infrastructure configuration
 │  ├─ docker-compose.routed.yml
@@ -65,7 +142,6 @@ ai-sec-monitor/
 │  └─ suricata/export/       # Verified Suricata alert logs (snapshots)
 ├─ ingest/                   # Log collection and schema mapping (future)
 ├─ detect/                   # Detection logic and rule integration
-├─ ai/                       # AI-based triage and correlation (future)
 ├─ notify/                   # Alerting and notification components
 ├─ ui/                       # Dashboards and visualization
 └─ scripts/                  # Utility scripts

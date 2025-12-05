@@ -1,0 +1,68 @@
+services:
+  chroma:
+    image: ghcr.io/chroma-core/chroma:latest
+    container_name: chroma
+    ports:
+      - "1563:8000"
+    environment:
+      - ANONYMIZED_TELEMETRY=false
+    volumes:
+      - ./chroma-data:/chroma
+    restart: unless-stopped
+
+  agent:
+    image: python:3.11-slim
+    container_name: ai_analysis
+    depends_on:
+      - chroma
+    volumes:
+      - ./logs:/app/logs
+      - ./agents/tools/pgres.py:/app/pgres.py
+      - ./agents/tools/chroma.py:/app/chroma.py
+      - ./agents/tools/check_relevance.py:/app/check_relevance.py
+      - ./python-files/chroma_setup.py:/app/chroma_setup.py
+      - ./python-files/postgres_setup.py:/app/postgres_setup.py
+      - ./python-files/main.py:/app/main.py
+      - ./agents/analyst-agent/analyst_agent.py:/app/analyst_agent.py
+      - ./agents/analyst-agent/email_agent.py:/app/email_agent.py
+      - ./agents/tools/websearch.py:/app/websearch.py
+      - ./agents/validation/feature_analyzer.py:/app/feature_analyzer.py
+      - ./agents/validation/validating_prompt.py:/app/validating_prompt.py
+      - ./agents/validation/context_agent.py:/app/context_agent.py
+      - ./agents/validation/validation_orchestrator.py:/app/validation_orchestrator.py
+      - ./prompts:/app/prompts
+      - ./pip-cache:/tmp/pip-cache
+      - ../output:/app/output
+      - ./training_data:/app/training_data
+    environment:
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+      - OLLAMA_PORT=11434
+      - OLLAMA_HOST=ollama
+      - VALIDATION_MODEL=llama3.1:8b
+      - ANALYST_MODEL=qwen3:32b
+      - PYTHONPATH=/app
+      - RAW_LOG_LOCATION=/app/logs/demo.json
+      - VALIDATED_LOG_LOCATION=/app/logs/validated_results.json
+      - OUTPUT_DIR=/app/output
+      - ENABLE_EMAIL=false
+      - ENABLE_VALIDATION=true
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+    working_dir: /app
+    command: >
+      bash -c "mkdir -p /tmp/pip-cache &&
+               chown -R root:root /tmp/pip-cache &&
+               pip install --cache-dir=/tmp/pip-cache chromadb psycopg2-binary langchain langchain-ollama requests ollama sentence-transformers PyPDF2 &&
+               python main.py"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "1561:11434"
+    volumes:
+      - ../ollama/ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    gpus: all
