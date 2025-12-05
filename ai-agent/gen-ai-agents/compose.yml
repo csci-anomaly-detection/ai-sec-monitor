@@ -39,10 +39,11 @@ services:
       - CHROMA_PORT=8000
       - OLLAMA_PORT=11434
       - OLLAMA_HOST=ollama
-      - OLLAMA_MODEL=llama3.1:8b
+      - VALIDATION_MODEL=llama3.1:8b
+      - ANALYST_MODEL=qwen3:32b
       - PYTHONPATH=/app
-      - LOG_LOCATION=/app/logs/eve.json
-      - VALIDATED_LOGS_PATH=/app/logs/eve_validated.json
+      - RAW_LOG_LOCATION=/app/logs/demo.json
+      - VALIDATED_LOG_LOCATION=/app/logs/validated_results.json
       - OUTPUT_DIR=/app/output
       - ENABLE_EMAIL=false
       - ENABLE_VALIDATION=true

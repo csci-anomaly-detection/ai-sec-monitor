@@ -74,7 +74,7 @@ class ValidationOrchestrator:
 
         self.fast_path_threshold = fast_path_threshold
         self.use_llm_consensus = use_llm_consensus
-        self.consensus_model = consensus_model or os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+        self.consensus_model = consensus_model or os.getenv("VALIDATION_MODEL", "llama3.1:8b")
         self.enable_logging = enable_logging
 
         # Load consensus prompt template

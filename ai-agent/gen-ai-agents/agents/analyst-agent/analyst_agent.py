@@ -72,10 +72,15 @@ def print_analysis_box(title, content_lines, color=Colors.GREEN):
 
 # ============================================================================
 
-port = os.getenv("OLLAMA_PORT", "11434")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "ollama")
+OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
+ANALYST_LLM = os.getenv("ANALYST_MODEL", "gpt-oss:20b")
+
+logger.info(f"🤖 Analyst Agent using model: {ANALYST_LLM}")
+
 llm = ChatOllama(
-    model="gpt-oss:20b",
-    base_url=f"http://ollama:{port}",
+    model=ANALYST_LLM,
+    base_url=f"http://{OLLAMA_HOST}:{OLLAMA_PORT}",
     temperature=0,
     num_ctx=8192,
     stop=["Observation:", "\nObservation"]

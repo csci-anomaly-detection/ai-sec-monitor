@@ -38,6 +38,7 @@ htmlcov/
 .idea/
 *.swp
 *.swo
+.cursor
 
 # Node (if used)
 node_modules/
