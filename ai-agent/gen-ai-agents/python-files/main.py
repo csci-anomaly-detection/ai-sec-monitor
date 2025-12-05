@@ -88,11 +88,9 @@ def load_validated_data(validated_log_location: str) -> tuple:
         with open(validated_file_path, 'r') as f:
             validated_data = json.load(f)
         
-        validated_alerts, validation_stats = stage_0_validation(RAW_LOG_LOCATION)
-        validated_data = {
-            "summary": validation_stats,
-            "detailed_results": validated_alerts
-        }
+        # Extract summary and detailed_results from loaded data
+        validation_stats = validated_data.get("summary", {})
+        detailed_results = validated_data.get("detailed_results", [])
         
         logs = [
             f"✅ Loaded {len(detailed_results)} validated alerts",

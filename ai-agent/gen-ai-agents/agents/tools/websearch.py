@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import List, Dict
+from typing import Dict
 
 TAVILY_URL = os.getenv("TAVILY_URL", "https://api.tavily.com/search")
 TAVILY_KEY = os.getenv("TAVILY_API_KEY")

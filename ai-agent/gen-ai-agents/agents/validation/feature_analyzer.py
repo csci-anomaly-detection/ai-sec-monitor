@@ -176,7 +176,6 @@ class FeatureAnalyzer:
                 
                 for match in matches:
                     # Extract timestamp (try multiple fields)
-                    timestamp = None
                     timestamp_fields = ["@timestamp", "suricata_timestamp", "timestamp", "event_time", "time"]
                     for field in timestamp_fields:
                         if field in match and match[field] is not None:
@@ -205,6 +204,7 @@ class FeatureAnalyzer:
                                 if port_int not in threat_data["ports"]:
                                     threat_data["ports"].append(port_int)
                             except (ValueError, TypeError):
+                                # If port cannot be converted to int, skip it as it's not a valid port number
                                 pass
             
             parsed_threats.append(threat_data)

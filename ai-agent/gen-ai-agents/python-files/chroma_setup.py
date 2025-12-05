@@ -4,11 +4,10 @@ and loads demo threats from demo.json
 """
 import chromadb
 import os
-import json
 from datetime import datetime
 import PyPDF2
 from pathlib import Path
-from typing import List, Tuple
+from typing import List
 
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
