@@ -390,7 +390,8 @@ def investigate_cluster(cluster_key, cluster_threats, max_tools=3):
                 })
         except Exception:
             # Failed to parse Chroma result as JSON; skipping citations
-            pass
+            # Failed to parse Chroma result as JSON; skipping citations.
+            logging.exception("Exception occurred while parsing Chroma result for citations")
         findings.append(f"🔧 Tool 1 (ChromaQuery): ✓ Success")
     except Exception:
         findings.append(f"🔧 Tool 1 (ChromaQuery): ✗ Failed")
