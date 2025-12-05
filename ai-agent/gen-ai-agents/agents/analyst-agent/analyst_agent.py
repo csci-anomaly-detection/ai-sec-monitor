@@ -3,7 +3,7 @@ import os
 import re
 import json
 from langchain_ollama import ChatOllama
-from chroma import query_chroma, query_chroma_semantic, query_chroma_advanced
+from chroma import query_chroma, query_chroma_semantic
 from websearch import websearch
 from collections import Counter, defaultdict
 
@@ -389,6 +389,7 @@ def investigate_cluster(cluster_key, cluster_threats, max_tools=3):
                     "similarity": meta.get("similarity_score")
                 })
         except Exception:
+            # Failed to parse Chroma result as JSON; skipping citations
             pass
         findings.append(f"🔧 Tool 1 (ChromaQuery): ✓ Success")
     except Exception:
@@ -420,6 +421,7 @@ def investigate_cluster(cluster_key, cluster_threats, max_tools=3):
                         "similarity": r.get("similarity_score")
                     })
             except Exception:
+                # Failed to parse semantic_result as JSON or extract citations; skipping
                 pass
             findings.append(f"🔧 Tool 2 (SemanticSearch): ✓ Success")
         except Exception:
@@ -468,8 +470,6 @@ def sanitize_json_string(json_str):
     Convert single quotes to double quotes in JSON strings
     Handles common JSON formatting issues from LLM output
     """
-    import re
-    
     # Pattern 1: ['item1', 'item2'] -> ["item1", "item2"]
     json_str = re.sub(r"\['([^']*?)'\]", r'["\1"]', json_str)
     json_str = re.sub(r"\['([^']*?)',\s*'([^']*?)'\]", r'["\1", "\2"]', json_str)

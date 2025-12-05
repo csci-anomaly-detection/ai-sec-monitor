@@ -669,8 +669,6 @@ Provide your decision in JSON format:
             llm_output = response["message"]["content"].strip()
             
             # ✅ ROBUST JSON EXTRACTION
-            import re
-            
             # Remove markdown code blocks
             if "```json" in llm_output:
                 llm_output = llm_output.split("```json")[1].split("```")[0]
@@ -785,7 +783,6 @@ Provide your decision in JSON format:
                 llm_output = llm_output.replace("```json", "").replace("```", "").strip()
             
             # Find JSON object using regex (handles leading/trailing text)
-            import re
             json_match = re.search(r'\{.*\}', llm_output, re.DOTALL)
             if json_match:
                 llm_output = json_match.group()

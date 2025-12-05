@@ -1,8 +1,7 @@
 import os
 import json
 import logging
-from typing import Dict, Any, Optional
-from datetime import datetime
+from typing import Dict, Optional
 import ollama
 import chromadb
 from pathlib import Path
@@ -750,7 +749,6 @@ Based on the above context, classify this threat as one of the following:
         """
         try:
             # Extract context data
-            ip_history = context_summary.get("ip_history", {})
             ip_reputation = context_summary.get("ip_reputation", {})
             similar_threats = context_summary.get("similar_threats", {})
 
