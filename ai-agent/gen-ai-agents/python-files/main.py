@@ -88,6 +88,11 @@ def load_validated_data(validated_log_location: str) -> tuple:
         with open(validated_file_path, 'r') as f:
             validated_data = json.load(f)
         
+        # Validate structure of loaded data
+        if not isinstance(validated_data, dict) or "summary" not in validated_data or "detailed_results" not in validated_data:
+            logger.error(f"❌ Invalid validated data structure in file: {validated_log_location}")
+            return {}, {}
+        
         # Extract summary and detailed_results from loaded data
         validation_stats = validated_data.get("summary", {})
         detailed_results = validated_data.get("detailed_results", [])
